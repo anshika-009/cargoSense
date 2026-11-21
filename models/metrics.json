@@ -64,6 +64,121 @@
     "First Class, 1 scheduled day": 0.997951090335846,
     "Standard Class, 4 scheduled days": 0.38966646790504456
   },
+  "threshold_sweep_validation": [
+    {
+      "threshold": 0.3,
+      "precision": 0.5485051353486632,
+      "recall": 0.9995453512161855,
+      "f1": 0.7083176716962896,
+      "share_flagged": 0.9991690556317254
+    },
+    {
+      "threshold": 0.35,
+      "precision": 0.5727743319498204,
+      "recall": 0.9306660604682883,
+      "f1": 0.709122401847575,
+      "share_flagged": 0.8908970044455524
+    },
+    {
+      "threshold": 0.4,
+      "precision": 0.6830005158057623,
+      "recall": 0.7023565961961051,
+      "f1": 0.6925433353257621,
+      "share_flagged": 0.5638373010926918
+    },
+    {
+      "threshold": 0.45,
+      "precision": 0.8131891433418151,
+      "recall": 0.5811926953095401,
+      "f1": 0.6778912015555261,
+      "share_flagged": 0.39187336407827494
+    },
+    {
+      "threshold": 0.5,
+      "precision": 0.850433356758023,
+      "recall": 0.5502008032128514,
+      "f1": 0.668138946399816,
+      "share_flagged": 0.35473015081640286
+    },
+    {
+      "threshold": 0.55,
+      "precision": 0.8530419373892498,
+      "recall": 0.5471698113207547,
+      "f1": 0.6666974425260825,
+      "share_flagged": 0.35169720387220077
+    },
+    {
+      "threshold": 0.6,
+      "precision": 0.8530072078459175,
+      "recall": 0.5470182617261499,
+      "f1": 0.6665743305632502,
+      "share_flagged": 0.3516141094353733
+    },
+    {
+      "threshold": 0.65,
+      "precision": 0.8544578313253012,
+      "recall": 0.5373948624687429,
+      "f1": 0.6598129971623947,
+      "share_flagged": 0.3448419128339358
+    },
+    {
+      "threshold": 0.7,
+      "precision": 0.8751185155086009,
+      "recall": 0.4895809653709176,
+      "f1": 0.6278911564625851,
+      "share_flagged": 0.30674311354854794
+    }
+  ],
+  "calibration_test": [
+    {
+      "bin": "(0.2, 0.3]",
+      "mean_predicted": 0.277910977602005,
+      "observed_late_rate": 0.3793103448275862,
+      "count": 29
+    },
+    {
+      "bin": "(0.3, 0.4]",
+      "mean_predicted": 0.37156227231025696,
+      "observed_late_rate": 0.37535852350667165,
+      "count": 16038
+    },
+    {
+      "bin": "(0.4, 0.5]",
+      "mean_predicted": 0.4209274649620056,
+      "observed_late_rate": 0.4168102876839454,
+      "count": 7543
+    },
+    {
+      "bin": "(0.5, 0.6]",
+      "mean_predicted": 0.5132208466529846,
+      "observed_late_rate": 0.5,
+      "count": 110
+    },
+    {
+      "bin": "(0.6, 0.7]",
+      "mean_predicted": 0.6696911454200745,
+      "observed_late_rate": 0.6826568265682657,
+      "count": 1626
+    },
+    {
+      "bin": "(0.7, 0.8]",
+      "mean_predicted": 0.776494562625885,
+      "observed_late_rate": 0.7907874420998456,
+      "count": 3886
+    },
+    {
+      "bin": "(0.8, 0.9]",
+      "mean_predicted": 0.822443425655365,
+      "observed_late_rate": 0.8265709156193896,
+      "count": 2785
+    },
+    {
+      "bin": "(0.9, 1.0]",
+      "mean_predicted": 0.9973133206367493,
+      "observed_late_rate": 0.9982872522632737,
+      "count": 4087
+    }
+  ],
   "top_importances": {
     "Days for shipment (scheduled)": 0.6574000120162964,
     "Shipping Mode_First Class": 0.19949999451637268,

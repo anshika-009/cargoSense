@@ -37,6 +37,8 @@ RANDOM_STATE = 42
 TEST_FOLDS = 5
 VALIDATION_FOLDS = 6
 THRESHOLD = 0.5
+THRESHOLDS = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7]
+CALIBRATION_EDGES = [i / 10 for i in range(11)]
 SUSPICIOUS_AUC = 0.95
 DOMINANT_SHARE = 0.5
 
@@ -77,6 +79,33 @@ def evaluate(y_true, proba, threshold=THRESHOLD):
         "recall": float(recall_score(y_true, pred)),
         "confusion_matrix": confusion_matrix(y_true, pred).tolist(),
     }
+
+
+def threshold_table(y_true, proba):
+    rows = []
+    for threshold in THRESHOLDS:
+        pred = (proba >= threshold).astype(int)
+        rows.append(
+            {
+                "threshold": threshold,
+                "precision": float(precision_score(y_true, pred, zero_division=0)),
+                "recall": float(recall_score(y_true, pred, zero_division=0)),
+                "f1": float(f1_score(y_true, pred, zero_division=0)),
+                "share_flagged": float(pred.mean()),
+            }
+        )
+    return rows
+
+
+def calibration_table(y_true, proba):
+    frame = pd.DataFrame({"predicted": proba, "actual": y_true.to_numpy()})
+    frame["bin"] = pd.cut(frame["predicted"], bins=CALIBRATION_EDGES, include_lowest=True).astype(str)
+    grouped = frame.groupby("bin", observed=True).agg(
+        mean_predicted=("predicted", "mean"),
+        observed_late_rate=("actual", "mean"),
+        count=("actual", "size"),
+    )
+    return grouped.reset_index().to_dict("records")
 
 
 def fit_xgb(X_train, y_train, X_val, y_val):
@@ -149,6 +178,13 @@ def main():
     print("\ntop 10 feature importances:")
     print(importances.head(10).round(4))
 
+    sweep = threshold_table(y_val, model.predict_proba(X_val)[:, 1])
+    calibration = calibration_table(y_test, model.predict_proba(X_test)[:, 1])
+    print("\nthreshold sweep on validation (choose the dashboard threshold here):")
+    print(pd.DataFrame(sweep).round(4).to_string(index=False))
+    print("\ncalibration on test (predicted vs observed late rate):")
+    print(pd.DataFrame(calibration).round(4).to_string(index=False))
+
     joblib.dump(model, MODELS_DIR / "final_xgb_model.pkl")
     joblib.dump(columns, MODELS_DIR / "processed_data_pipeline.pkl")
     (MODELS_DIR / "defaults.json").write_text(json.dumps(defaults, indent=2))
@@ -161,6 +197,8 @@ def main():
         "best_iteration": int(model.best_iteration),
         "baselines": {name: results[name] for name in baselines},
         "hand_made_rows": hand_made,
+        "threshold_sweep_validation": sweep,
+        "calibration_test": calibration,
         "top_importances": importances.head(10).round(4).to_dict(),
     }
     (MODELS_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2))
