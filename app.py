@@ -1,6 +1,7 @@
 """CargoSense Streamlit dashboard: pre-dispatch late-delivery risk simulation and network corridor intelligence."""
 
 import base64
+import os
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -709,16 +710,29 @@ def get_arrival_weather(city, days):
     }
 
 
+API_URL = os.environ.get("CARGOSENSE_API", "http://127.0.0.1:8000")
+
+
 def get_prediction(payload):
+    """Score through the FastAPI model service; fall back to the hub table if it is down."""
     city = payload["destination_city"]
     weather = get_arrival_weather(city, payload["scheduled_shipping_days"])
-    total_pct = min(round(INDIAN_HUBS[city]["base_risk"] + weather["penalty_pct"], 1), 100.0)
-    return {
-        "late_delivery_risk_prob": round(total_pct / 100, 4),
-        "late_delivery_risk_pred": int(total_pct >= 50),
-        "weather_delay_penalty_pct": weather["penalty_pct"],
-        "status": status_from_risk(total_pct),
-    }
+    body = dict(payload, weather_delay_penalty_pct=weather["penalty_pct"])
+    try:
+        res = requests.post(f"{API_URL}/predict", json=body, timeout=8)
+        res.raise_for_status()
+        return dict(res.json(), source="model")
+    except requests.RequestException as exc:
+        st.warning(f"Model API unreachable ({exc.__class__.__name__}). Showing the static corridor estimate instead.")
+        total_pct = min(round(INDIAN_HUBS[city]["base_risk"] + weather["penalty_pct"], 1), 100.0)
+        return {
+            "late_delivery_risk_prob": round(total_pct / 100, 4),
+            "late_delivery_risk_pred": int(total_pct >= 50),
+            "base_risk_pct": round(total_pct - weather["penalty_pct"], 1),
+            "weather_delay_penalty_pct": weather["penalty_pct"],
+            "status": status_from_risk(total_pct),
+            "source": "fallback",
+        }
 
 
 def metric_tile(label, value_html, sub_html, accent_color):
