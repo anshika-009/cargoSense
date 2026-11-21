@@ -1,0 +1,79 @@
+{
+  "roc_auc": 0.7426260255360408,
+  "accuracy": 0.6939674274318635,
+  "f1": 0.657809161014587,
+  "precision": 0.850008003841844,
+  "recall": 0.5364991159383683,
+  "confusion_matrix": [
+    [
+      14435,
+      1874
+    ],
+    [
+      9175,
+      10620
+    ]
+  ],
+  "threshold": 0.5,
+  "split": "pooled train+test, StratifiedGroupKFold by Order Id (test 1/5, validation 1/6 of rest)",
+  "random_state": 42,
+  "rows": {
+    "train": 120346,
+    "validation": 24069,
+    "test": 36104
+  },
+  "best_iteration": 53,
+  "baselines": {
+    "logistic_regression": {
+      "roc_auc": 0.7424583106896582,
+      "accuracy": 0.6939397296698426,
+      "f1": 0.6574493148986298,
+      "precision": 0.8508384819064431,
+      "recall": 0.5356908310179338,
+      "confusion_matrix": [
+        [
+          14450,
+          1859
+        ],
+        [
+          9191,
+          10604
+        ]
+      ]
+    },
+    "random_forest": {
+      "roc_auc": 0.741155298799636,
+      "accuracy": 0.6938566363837801,
+      "f1": 0.6608572918903992,
+      "precision": 0.8415911222256955,
+      "recall": 0.5440262692599142,
+      "confusion_matrix": [
+        [
+          14282,
+          2027
+        ],
+        [
+          9026,
+          10769
+        ]
+      ]
+    }
+  },
+  "hand_made_rows": {
+    "Same Day, 0 scheduled days": 0.48719945549964905,
+    "First Class, 1 scheduled day": 0.997951090335846,
+    "Standard Class, 4 scheduled days": 0.38966646790504456
+  },
+  "top_importances": {
+    "Days for shipment (scheduled)": 0.6574000120162964,
+    "Shipping Mode_First Class": 0.19949999451637268,
+    "Shipping Mode_Second Class": 0.06239999830722809,
+    "Type_TRANSFER": 0.04230000078678131,
+    "Market_USCA": 0.002199999988079071,
+    "Type_DEBIT": 0.002099999925121665,
+    "Customer Segment_Home Office": 0.0019000000320374966,
+    "Department Name_Apparel": 0.0019000000320374966,
+    "Customer Segment_Consumer": 0.0017999999690800905,
+    "Department Name_Fan Shop": 0.0017000000225380063
+  }
+}
