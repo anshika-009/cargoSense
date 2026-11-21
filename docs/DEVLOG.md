@@ -13,6 +13,12 @@ A running record of what changed and why. Newest entry on top.
 **Template**
 
 ```
+## YYYY-MM-DD | branch-name | owner
+Done: what was built or changed
+Files: files touched
+Decisions: choices made and why
+Open: anything unresolved or to verify
+
 ## 2026-11-21 | feature/ui | AgentRob0
 Done: Replaced CSV batch input with a single-order flow (sidebar inputs, `validate_inputs`, `get_prediction` stub, session-state results). Replaced map overlays with three cards below the map: arrival-day forecast, risk attribution, dispatch status. Added `status_from_risk` (65 and 35 thresholds) and `get_arrival_weather`. KPIs now computed from `INDIAN_HUBS`; fake metrics removed.
 Files: app.py
