@@ -112,17 +112,6 @@ Invalid input returns HTTP 422. Interactive docs are available at `http://localh
 - **Features:** payment type, shipping mode, scheduled shipping days, sales per customer, item quantity, product price, discount, benefit per order, customer segment, department, order region.
 - **Leakage prevention:** `Days for shipping (real)`, `Delivery Status` and any field known only after dispatch are excluded.
 
-## Evaluation
-
-| Metric            | Value |
-| ----------------- | ----- |
-| ROC-AUC (primary) | 0.91  |
-| Accuracy          | 89.4% |
-| F1 (late class)   | TBD   |
-| Test split        | TBD   |
-
-These numbers are valid only if the leakage columns are excluded from training.
-
 ## Limitations
 
 - Evaluation uses the same historical dataset, so performance on Indian routes is unmeasured.
