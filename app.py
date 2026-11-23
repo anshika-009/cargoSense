@@ -75,7 +75,6 @@ CRITICAL_WARN_PIN_URI = svg_to_data_uri(
     "</svg>"
 )
 
-# Apply pending one-click mitigation updates before widget instantiation
 if "pending_mode_update" in st.session_state:
     st.session_state["shipping_mode_input"] = st.session_state.pop("pending_mode_update")
 if "pending_days_update" in st.session_state:
@@ -466,6 +465,17 @@ div[data-testid="stDeckGlJsonChart"] {{
     color: {text_main} !important;
 }}
 
+.terrain-box {{
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid {border_card};
+    background: rgba(14, 165, 233, 0.07);
+    font-size: 12px;
+    line-height: 1.45;
+    color: {text_main} !important;
+}}
+
 .metric-tile {{
     background-color: {bg_card} !important;
     border: 1px solid {border_card} !important;
@@ -643,6 +653,41 @@ def format_weather_condition(condition_text, precip_mm=0.0, wind_kmh=0.0):
     else:
         emoji = "⛅"
     return f"{emoji} {(condition_text or 'Variable').title()}"
+
+
+def get_terrain_profile(state_name: str, dist_km: float):
+    state_upper = (state_name or "").upper()
+    himalayan = ["HIMACHAL PRADESH", "UTTARAKHAND", "JAMMU AND KASHMIR", "LADAKH", "SIKKIM", "ARUNACHAL PRADESH", "NAGALAND", "MANIPUR", "MIZORAM", "MEGHALAYA"]
+    ghats_plateau = ["KARNATAKA", "KERALA", "GOA", "MAHARASHTRA", "TELANGANA", "ANDHRA PRADESH"]
+    coastal = ["TAMIL NADU", "ODISHA", "WEST BENGAL", "GUJARAT"]
+
+    if any(h in state_upper for h in himalayan):
+        return {
+            "type": "Himalayan Ridge / Montane Pass",
+            "friction_mult": 1.75,
+            "gradient_desc": "High elevation gradient, tight switchbacks & landslide vulnerability.",
+            "color": "#f43f5e",
+        }
+    if any(g in state_upper for g in ghats_plateau):
+        return {
+            "type": "Western Ghats / Deccan Plateau",
+            "friction_mult": 1.40,
+            "gradient_desc": "Rolling plateau & steep ghat passes; monsoon fog holdover zone.",
+            "color": "#f59e0b",
+        }
+    if any(c in state_upper for c in coastal):
+        return {
+            "type": "Coastal Plain / Estuarine Belt",
+            "friction_mult": 1.25,
+            "gradient_desc": "Flat maritime line-haul; high humidity & storm waterlogging.",
+            "color": "#0284c7",
+        }
+    return {
+        "type": "Indo-Gangetic / Northern Plains",
+        "friction_mult": 1.05,
+        "gradient_desc": "Optimal flat multi-lane highway; seasonal winter fog friction.",
+        "color": "#10b981",
+    }
 
 
 @st.cache_data(show_spinner=False)
@@ -1449,6 +1494,23 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
         weather_info["condition"], weather_info["precip"], weather_info["wind"]
     )
 
+    terrain_info = get_terrain_profile(active_hub_rec["state"], active_hub_rec["dist"])
+
+    terrain_html = ""
+    if current_pred:
+        pct_width = int(min((terrain_info["friction_mult"] / 2.0) * 100.0, 100.0))
+        terrain_html = (
+            f'<div class="terrain-box">'
+            f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
+            f'<strong>Topology:</strong> <span>{terrain_info["type"]}</span>'
+            f'</div>'
+            f'<div style="font-size:11.5px; color:{text_sub}; margin-bottom:6px;">{terrain_info["gradient_desc"]}</div>'
+            f'<div style="display:flex; align-items:center; font-size:11.5px;">'
+            f'<span style="font-weight:700;">Corridor Friction: {terrain_info["friction_mult"]:.2f}×</span>'
+            f'<span class="mini-bar" style="width:90px; margin-left:10px;"><div style="width:{pct_width}%; background:{terrain_info["color"]};"></div></span>'
+            f'</div></div>'
+        )
+
     what_if_html = ""
     if current_pred and current_what_if:
         delta_sign = "+" if current_what_if["diff_pct"] > 0 else ""
@@ -1518,6 +1580,7 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                 <span class="left-stat-label">Est. Arrival</span>
                 <span class="left-stat-val">{forecast_date_text}</span>
             </div>
+            {terrain_html}
             {what_if_html}
             <div class="left-advisory">
                 {active_hub_rec["advisory"]}
@@ -1528,7 +1591,6 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
         unsafe_allow_html=True,
     )
 
-    # One-click dispatch remedy action after scoring
     if current_pred and active_status != STATUS_STABLE:
         st.write("")
         if current_mode != "First Class":
@@ -1557,7 +1619,6 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                 )
                 st.rerun()
 
-    # Feature 3: Export Dispatch Manifest (CSV Download)
     if current_pred:
         st.write("")
         manifest_record = {
@@ -1566,6 +1627,8 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
             "destination_city": active_hub_rec["city"],
             "destination_state": active_hub_rec["state"],
             "distance_km": active_hub_rec["dist"],
+            "terrain_type": terrain_info["type"],
+            "friction_multiplier": terrain_info["friction_mult"],
             "shipping_mode": current_mode,
             "scheduled_transit_days": current_days,
             "order_quantity": order_quantity,
