@@ -195,6 +195,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-23: Page 1 now uses the API for weather. Added a dispatch date picker; the request sends `dispatch_date`, destination coordinates and state. The summary card shows the penalty split, weather window, worst segment, route averages and arrival date from the response, and a "weather unavailable" warning when `weather_available` is false. Removed the dashboard's own live weather fetch and the static offline fallback (including the invented +1 day relief); if the API is down or rejects the order the dashboard shows the error and stores nothing. Removed the per-hub advisory text from the card. Page 2 and `states_cities.py` still use the hardcoded hub weather and risk until page 2 is rebuilt.
 - 2026-11-23: Prepared an updated `app.py`: consolidated summary card, title no longer hidden under the header (top padding 2.2rem to 4.5rem), emojis and clutter removed, solid accent on the Run button ("Run risk assessment"). Not yet confirmed applied to the repo.
 - 2026-11-21: Replaced CSV input with the single-order flow (`validate_inputs`, `get_prediction`, session-state results), added `status_from_risk` and `get_arrival_weather`, removed fake metrics. Results are tied to the exact payload, so an input change needs a re-run. The Run button sits above the sidebar panels.
 

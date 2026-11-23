@@ -5,7 +5,7 @@ and network corridor intelligence across all 28 Indian states.
 import base64
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -20,7 +20,8 @@ from states_cities import (
     get_all_city_records,
     get_hub_record,
 )
-from weather_utils import get_arrival_weather as fetch_arrival_weather
+from route_weather import FORECAST_HORIZON_DAYS
+from weather_utils import condition_label
 
 st.set_page_config(
     page_title="CargoSense — 3D Telemetry & Route Analysis",
@@ -845,8 +846,9 @@ def status_from_risk(total_pct):
     return STATUS_STABLE
 
 
-def validate_inputs(order_quantity, scheduled_shipping_days, sales_per_customer, product_price):
+def validate_inputs(order_quantity, scheduled_shipping_days, sales_per_customer, product_price, dispatch_date):
     errors = []
+    today = date.today()
     if order_quantity < 1:
         errors.append("Order quantity must be at least 1.")
     if scheduled_shipping_days < 1:
@@ -855,6 +857,10 @@ def validate_inputs(order_quantity, scheduled_shipping_days, sales_per_customer,
         errors.append("Sales per customer (USD) cannot be negative.")
     if product_price < 0:
         errors.append("Product price (USD) cannot be negative.")
+    if dispatch_date < today:
+        errors.append("Dispatch date cannot be in the past.")
+    elif (dispatch_date + timedelta(days=scheduled_shipping_days) - today).days > FORECAST_HORIZON_DAYS:
+        errors.append(f"Arrival date must be within {FORECAST_HORIZON_DAYS} days from today (forecast limit).")
     return errors
 
 
@@ -873,87 +879,90 @@ def get_static_weather(hub_record, days):
     }
 
 
-def get_arrival_weather(hub_record, days):
-    longitude, latitude = hub_record["coords"]
-    result = fetch_arrival_weather(latitude, longitude, int(days))
+def get_static_weather(hub_record, days):
     return {
-        "available": result["available"],
-        "reason": result["reason"],
-        "precip": result["precip_mm"],
-        "wind": result["wind_kmh"],
-        "temp_c": result["temp_c"],
-        "condition": result["condition"],
-        "forecast_date": result["forecast_date"],
-        "penalty_pct": result["penalty"]["total"],
+        "precip": hub_record["precip"],
+        "wind": hub_record["wind"],
+        "temp_c": hub_record["temp_c"],
+        "condition": hub_record["weather"],
+        "forecast_date": datetime.now() + timedelta(days=days),
+        "penalty_pct": hub_record["weather_penalty"],
     }
 
 
-def get_prediction(payload, hub_record):
-    weather = get_arrival_weather(hub_record, payload["scheduled_shipping_days"])
-    body = dict(payload, weather_delay_penalty_pct=weather["penalty_pct"])
-    try:
-        res = requests.post(f"{API_URL}/predict", json=body, timeout=8)
-        res.raise_for_status()
-        return dict(res.json(), source="model")
-    except requests.RequestException:
-        total_pct = min(round(hub_record["base_risk"] + weather["penalty_pct"], 1), 100.0)
-        return {
-            "late_delivery_risk_prob": round(total_pct / 100.0, 4),
-            "late_delivery_risk_pred": int(total_pct >= 50),
-            "base_risk_pct": round(total_pct - weather["penalty_pct"], 1),
-            "weather_delay_penalty_pct": weather["penalty_pct"],
-            "status": status_from_risk(total_pct),
-            "source": "fallback",
-        }
-
-
-def get_plus_one_day_what_if(payload, hub_record, current_total_pct):
-    if payload["scheduled_shipping_days"] >= 6:
-        return None
-    next_days = payload["scheduled_shipping_days"] + 1
-    next_payload = dict(payload, scheduled_shipping_days=next_days)
-    next_pred = get_prediction(next_payload, hub_record)
-    next_total_pct = round(next_pred["late_delivery_risk_prob"] * 100.0, 1)
-
-    if next_pred.get("source") == "fallback":
-        relief = 0.0
-        if hub_record.get("weather_penalty", 0.0) >= 7.5 or hub_record.get("dist", 0) >= 1500:
-            relief = -3.5
-        elif payload["scheduled_shipping_days"] <= 2:
-            relief = -2.0
-        next_total_pct = min(max(round(current_total_pct + relief, 1), 0.0), 100.0)
-
-    diff_pct = round(next_total_pct - current_total_pct, 1)
+def build_payload(hub_rec, qty, sales, price, mode, days, dispatch):
     return {
-        "next_days": next_days,
-        "next_total_pct": next_total_pct,
-        "diff_pct": diff_pct,
-    }
-
-
-def run_and_store_assessment(hub_rec, qty, sales, price, mode, days):
-    current_payload = {
         "order_quantity": int(qty),
         "sales_per_customer": float(sales),
         "product_price": float(price),
         "shipping_mode": mode,
         "scheduled_shipping_days": int(days),
         "destination_city": hub_rec["city"],
+        "destination_state": hub_rec["state"],
+        "destination_lat": hub_rec["coords"][1],
+        "destination_lon": hub_rec["coords"][0],
         "origin_hub": ORIGIN_HUB,
+        "dispatch_date": dispatch.isoformat(),
     }
+
+
+def describe_api_error(response):
+    try:
+        detail = response.json().get("detail")
+    except ValueError:
+        detail = None
+    if isinstance(detail, list):
+        detail = "; ".join(str(item.get("msg", item)) for item in detail)
+    if detail:
+        return f"The API rejected this order: {detail}"
+    return f"The prediction service returned HTTP {response.status_code}."
+
+
+def get_prediction(payload):
+    try:
+        response = requests.post(f"{API_URL}/predict", json=payload, timeout=30)
+    except requests.RequestException:
+        return None, "The prediction service is not reachable. Start it with: uvicorn FastAPI:app --reload"
+    if not response.ok:
+        return None, describe_api_error(response)
+    return response.json(), None
+
+
+def get_plus_one_day_what_if(payload, current_total_pct):
+    if payload["scheduled_shipping_days"] >= 6:
+        return None
+    next_days = payload["scheduled_shipping_days"] + 1
+    next_pred, error = get_prediction(dict(payload, scheduled_shipping_days=next_days))
+    if error:
+        return None
+    next_total_pct = round(next_pred["late_delivery_risk_prob"] * 100.0, 1)
+    return {
+        "next_days": next_days,
+        "next_total_pct": next_total_pct,
+        "diff_pct": round(next_total_pct - current_total_pct, 1),
+    }
+
+
+def run_and_store_assessment(hub_rec, qty, sales, price, mode, days, dispatch):
+    current_payload = build_payload(hub_rec, qty, sales, price, mode, days, dispatch)
     input_errors = validate_inputs(
         current_payload["order_quantity"],
         current_payload["scheduled_shipping_days"],
         current_payload["sales_per_customer"],
         current_payload["product_price"],
+        dispatch,
     )
     if input_errors:
         for err_msg in input_errors:
             st.error(err_msg)
         return
-    pred_result = get_prediction(current_payload, hub_rec)
-    total_pct_val = round(pred_result["late_delivery_risk_prob"] * 100.0, 1)
-    what_if_result = get_plus_one_day_what_if(current_payload, hub_rec, total_pct_val)
+    with st.spinner("Scoring order and fetching route weather"):
+        pred_result, error = get_prediction(current_payload)
+        if error:
+            st.error(error)
+            return
+        total_pct_val = round(pred_result["late_delivery_risk_prob"] * 100.0, 1)
+        what_if_result = get_plus_one_day_what_if(current_payload, total_pct_val)
     st.session_state["prediction"] = {
         "payload": current_payload,
         "result": pred_result,
@@ -1084,13 +1093,20 @@ with c_days:
         key="committed_days_input",
     )
 
-c_qty, c_sales, c_price, c_arcs, c_view, c_run = st.columns([1.0, 1.2, 1.2, 1.2, 1.5, 1.4])
+c_qty, c_sales, c_price, c_date, c_arcs, c_view, c_run = st.columns([0.9, 1.1, 1.1, 1.3, 1.2, 1.5, 1.4])
 with c_qty:
     order_quantity = st.number_input("Quantity", min_value=1, value=1, step=1)
 with c_sales:
     sales_per_customer = st.number_input("Sales (USD)", min_value=0.0, value=50.0, step=1.0)
 with c_price:
     product_price = st.number_input("Price (USD)", min_value=0.0, value=10.0, step=1.0)
+with c_date:
+    dispatch_date = st.date_input(
+        "Dispatch Date",
+        value=date.today(),
+        min_value=date.today(),
+        max_value=date.today() + timedelta(days=FORECAST_HORIZON_DAYS - 1),
+    )
 with c_arcs:
     st.write("")
     show_secondary = st.checkbox("All Corridor Arcs", value=False)
@@ -1162,18 +1178,14 @@ if run_clicked:
             product_price,
             shipping_mode,
             committed_days,
+            dispatch_date,
         )
 
 expected_payload = (
-    {
-        "order_quantity": int(order_quantity),
-        "sales_per_customer": float(sales_per_customer),
-        "product_price": float(product_price),
-        "shipping_mode": shipping_mode,
-        "scheduled_shipping_days": int(committed_days),
-        "destination_city": active_hub["city"],
-        "origin_hub": ORIGIN_HUB,
-    }
+    build_payload(
+        active_hub, order_quantity, sales_per_customer, product_price,
+        shipping_mode, committed_days, dispatch_date,
+    )
     if active_hub
     else None
 )
@@ -1623,12 +1635,12 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                 </div>
                 <div class="left-stat-row"><span class="left-stat-label">ML Total Risk</span><span class="left-stat-val">--</span></div>
                 <div class="left-stat-row"><span class="left-stat-label">ML Base Risk</span><span class="left-stat-val">--</span></div>
-                <div class="left-stat-row"><span class="left-stat-label">Weather Penalty</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Weather Penalty (route avg)</span><span class="left-stat-val">--</span></div>
                 <div class="left-stat-row"><span class="left-stat-label">Route Distance</span><span class="left-stat-val">--</span></div>
                 <div class="left-stat-row"><span class="left-stat-label">Shipping Mode</span><span class="left-stat-val">--</span></div>
-                <div class="left-stat-row"><span class="left-stat-label">Conditions</span><span class="left-stat-val">--</span></div>
-                <div class="left-stat-row"><span class="left-stat-label">Rainfall / Wind</span><span class="left-stat-val">--</span></div>
-                <div class="left-stat-row"><span class="left-stat-label">Temperature</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Worst Conditions</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Avg Rainfall / Wind</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Avg Temperature</span><span class="left-stat-val">--</span></div>
                 <div class="left-stat-row"><span class="left-stat-label">Est. Arrival</span><span class="left-stat-val">--</span></div>
                 <div class="left-advisory">
                     Select a <strong>Destination State</strong> and <strong>Destination City</strong> above, then click <strong>Run Risk Assessment</strong>.
@@ -1639,14 +1651,28 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
         )
         return STATUS_MODERATE
 
-    weather_info = get_arrival_weather(active_hub_rec, current_days)
-    if not weather_info["available"]:
-        st.warning("Arrival-day forecast unavailable. No weather penalty is applied.")
-    weather_pct = (
-        current_pred["weather_delay_penalty_pct"]
-        if current_pred
-        else weather_info["penalty_pct"]
-    )
+    weather_info = {"available": False, "precip": None, "wind": None, "temp_c": None, "condition": "UNAVAILABLE"}
+    weather_pct = 0.0
+    weather_note = "n/a"
+    if current_pred:
+        route_values = current_pred["weather"]
+        weather_info["available"] = current_pred["weather_available"]
+        if weather_info["available"]:
+            weather_pct = current_pred["weather_delay_penalty_pct"]
+            weather_info.update(
+                precip=route_values["worst_precip_mm"],
+                wind=route_values["worst_wind_kmh"],
+                temp_c=route_values["temp_c_avg"],
+                condition=condition_label(route_values["worst_precip_mm"] or 0.0, route_values["worst_wind_kmh"] or 0.0),
+            )
+            weather_note = (
+                f'rain {current_pred["weather_rain_pct"]:.1f} · wind {current_pred["weather_wind_pct"]:.1f}'
+                f' · heat {current_pred["weather_heat_pct"]:.1f}'
+            )
+        else:
+            st.warning(
+                "Route weather is unavailable. No weather penalty is applied, so the risk shown is the model's base risk only."
+            )
 
     if current_pred:
         active_total_pct = round(current_pred["late_delivery_risk_prob"] * 100.0, 1)
@@ -1657,18 +1683,31 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
         total_color = STATUS_COLORS[active_status]
         status_badge = f'<span class="{STATUS_TAG_CLASS[active_status]}">{active_status}</span>'
     else:
-        active_status = status_from_risk(
-            min(round(active_hub_rec["base_risk"] + weather_pct, 1), 100.0)
-        )
+        active_status = STATUS_MODERATE
         total_display = "Pending"
         base_display = "Pending"
         total_color = text_sub
         status_badge = '<span class="tag-mod">READY TO SCORE</span>'
 
-    forecast_date_text = weather_info["forecast_date"].strftime("%d %b %Y")
-    weather_display = format_weather_condition(
-        weather_info["condition"], weather_info["precip"], weather_info["wind"]
-    )
+    if current_pred:
+        arrival_text = date.fromisoformat(str(current_pred["weather_arrival_date"])).strftime("%d %b %Y")
+        window_text = f'{date.fromisoformat(str(current_pred["weather_dispatch_date"])).strftime("%d %b")} to {arrival_text}'
+        route_km = current_pred["distance_km"]
+    else:
+        arrival_text = (dispatch_date + timedelta(days=int(current_days))).strftime("%d %b %Y")
+        window_text = f'{dispatch_date.strftime("%d %b")} to {arrival_text}'
+        route_km = active_hub_rec["dist"]
+    weather_display = format_weather_condition(weather_info["condition"], weather_info["precip"], weather_info["wind"])
+    if current_pred and weather_info["available"]:
+        worst_text = (
+            f'{route_values["worst_date"]} near {route_values["worst_lat"]:.1f}, {route_values["worst_lon"]:.1f}'
+            f' (+{current_pred["weather_worst_penalty_pct"]:.1f}%)'
+        )
+        avg_text = f'{show(route_values["precip_mm_avg"], " mm")} · {show(route_values["wind_kmh_avg"], " km/h")}'
+        temp_text = show(route_values["temp_c_avg"], " °C")
+    else:
+        worst_text = avg_text = temp_text = "n/a"
+    penalty_text = "Unavailable" if (current_pred and not weather_info["available"]) else f"+{weather_pct:.1f}%"
 
     terrain_info = get_terrain_profile(active_hub_rec["state"], active_hub_rec["dist"])
 
@@ -1729,38 +1768,47 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                 <span class="left-stat-val">{base_display}</span>
             </div>
             <div class="left-stat-row">
-                <span class="left-stat-label">Weather Penalty</span>
-                <span class="left-stat-val" style="color: {crit_text if weather_pct > 0 else text_main};">+{weather_pct:.1f}%</span>
+                <span class="left-stat-label">Weather Penalty (route avg)</span>
+                <span class="left-stat-val" style="color: {crit_text if weather_pct > 0 else text_main};">{penalty_text}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Penalty Split</span>
+                <span class="left-stat-val">{weather_note}</span>
             </div>
             <div class="left-stat-row">
                 <span class="left-stat-label">Route Distance</span>
-                <span class="left-stat-val">{active_hub_rec["dist"]:,.0f} km</span>
+                <span class="left-stat-val">{route_km:,.0f} km</span>
             </div>
             <div class="left-stat-row">
                 <span class="left-stat-label">Shipping Mode</span>
                 <span class="left-stat-val">{current_mode}</span>
             </div>
             <div class="left-stat-row">
-                <span class="left-stat-label">Conditions</span>
+                <span class="left-stat-label">Weather Window</span>
+                <span class="left-stat-val">{window_text}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Worst Conditions</span>
                 <span class="left-stat-val">{weather_display}</span>
             </div>
             <div class="left-stat-row">
-                <span class="left-stat-label">Rainfall / Wind</span>
-                <span class="left-stat-val">{show(weather_info["precip"], " mm")} · {show(weather_info["wind"], " km/h")}</span>
+                <span class="left-stat-label">Worst Segment</span>
+                <span class="left-stat-val">{worst_text}</span>
             </div>
             <div class="left-stat-row">
-                <span class="left-stat-label">Temperature</span>
-                <span class="left-stat-val">{show(weather_info["temp_c"], " °C")}</span>
+                <span class="left-stat-label">Avg Rainfall / Wind</span>
+                <span class="left-stat-val">{avg_text}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Avg Temperature</span>
+                <span class="left-stat-val">{temp_text}</span>
             </div>
             <div class="left-stat-row">
                 <span class="left-stat-label">Est. Arrival</span>
-                <span class="left-stat-val">{forecast_date_text}</span>
+                <span class="left-stat-val">{arrival_text}</span>
             </div>
             {terrain_html}
             {what_if_html}
-            <div class="left-advisory">
-                {active_hub_rec["advisory"]}
-            </div>
             {mitigation_html}
         </div>
         """,
@@ -1779,6 +1827,7 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                     product_price,
                     "First Class",
                     current_days,
+                    dispatch_date,
                 )
                 st.rerun()
         elif current_days < 6:
@@ -1792,6 +1841,7 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                     product_price,
                     current_mode,
                     next_d,
+                    dispatch_date,
                 )
                 st.rerun()
 
@@ -1802,7 +1852,9 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
             "origin_hub": ORIGIN_HUB,
             "destination_city": active_hub_rec["city"],
             "destination_state": active_hub_rec["state"],
-            "distance_km": active_hub_rec["dist"],
+            "distance_km": route_km,
+            "dispatch_date": dispatch_date.isoformat(),
+            "weather_available": weather_info["available"],
             "terrain_type": terrain_info["type"],
             "friction_multiplier": terrain_info["friction_mult"],
             "shipping_mode": current_mode,
