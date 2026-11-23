@@ -106,53 +106,77 @@ with top_col2:
     )
 
 if theme_mode == "Light Mode":
-    bg_app = "#e9f2fc"
-    bg_grad_top = "#eff6ff"
-    bg_grad_bottom = "#dbeafe"
-    bg_card = "rgba(255, 255, 255, 0.92)"
-    bg_toolbar = "#dbeafe"
+    # Sunrise Haze: Soft Peach (#FDF6E3) + Sky Blue (#E0F6FF) mixed
+    bg_app_mix = (
+        "linear-gradient(125deg, #E0F6FF 0%, #EDF6F4 48%, #FDF6E3 100%), "
+        "radial-gradient(circle at 15% 15%, rgba(224, 246, 255, 0.85), transparent 50%), "
+        "radial-gradient(circle at 88% 85%, rgba(253, 246, 227, 0.90), transparent 50%)"
+    )
+    sidebar_bg = "linear-gradient(180deg, #E0F6FF 0%, #EEF6F5 52%, #FDF6E3 100%)"
+    sidebar_text = "#0f172a"
+    sidebar_sub = "#334155"
+    sidebar_card_bg = "rgba(255, 255, 255, 0.72)"
+    sidebar_border = "rgba(15, 23, 42, 0.14)"
+    sidebar_delta_bg = "rgba(4, 120, 87, 0.14)"
+    sidebar_delta_text = "#047857"
+    bg_card = "rgba(255, 253, 248, 0.90)"
+    bg_toolbar = "#E0F6FF"
     bg_input = "#ffffff"
     text_input = "#0f172a"
-    border_input = "#94a3b8"
-    border_card = "#bfd7f2"
+    border_input = "#7c98b3"
+    border_card = "#c8dff0"
     text_main = "#0f172a"
     text_sub = "#475569"
-    grid_line = "rgba(2, 132, 199, 0.05)"
-    accent = "#1d4ed8"
-    accent_soft = "rgba(29, 78, 216, 0.10)"
+    accent = "#0369a1"
+    accent_soft = "rgba(3, 105, 161, 0.10)"
+    btn_sec_bg = "#ffffff"
+    btn_sec_text = "#0f172a"
+    btn_sec_border = "#64748b"
     ok_text = "#047857"
     mod_text = "#b45309"
     crit_text = "#be123c"
-    tile_shadow = "0 8px 22px rgba(30, 64, 175, 0.08)"
+    tile_shadow = "0 8px 22px rgba(15, 23, 42, 0.07)"
     map_style_choice = pdk.map_styles.CARTO_LIGHT
     arc_inactive_color = [100, 116, 139, 95]
     pin_label_color = [15, 23, 42, 255]
     secondary_label_color = [71, 85, 105, 220]
     state_border_color = [51, 92, 129, 165]
 else:
-    bg_app = "#0a0f24"
-    bg_grad_top = "#0a0f24"
-    bg_grad_bottom = "#070b1a"
-    bg_card = "#141b3b"
-    bg_toolbar = "#1b2450"
-    bg_input = "#0b1026"
-    text_input = "#ffffff"
-    border_input = "#4a5590"
-    border_card = "#2a3566"
-    text_main = "#eef1ff"
-    text_sub = "#9aa6d1"
-    grid_line = "rgba(129, 140, 248, 0.05)"
-    accent = "#818cf8"
-    accent_soft = "rgba(129, 140, 248, 0.16)"
+    # Northern Lights: Deep Teal (#0C2B3C) + Soft Lavender (#6B5B95) mixed
+    bg_app_mix = (
+        "linear-gradient(125deg, #0C2B3C 0%, #243b5c 52%, #6B5B95 100%), "
+        "radial-gradient(circle at 12% 18%, rgba(12, 43, 60, 0.85), transparent 52%), "
+        "radial-gradient(circle at 88% 82%, rgba(107, 91, 149, 0.65), transparent 52%)"
+    )
+    sidebar_bg = "linear-gradient(180deg, #0C2B3C 0%, #243b5c 52%, #6B5B95 100%)"
+    sidebar_text = "#f8fafc"
+    sidebar_sub = "#ddd6fe"
+    sidebar_card_bg = "rgba(8, 28, 40, 0.55)"
+    sidebar_border = "rgba(221, 214, 254, 0.28)"
+    sidebar_delta_bg = "rgba(52, 211, 153, 0.18)"
+    sidebar_delta_text = "#6ee7b7"
+    bg_card = "rgba(16, 44, 62, 0.86)"
+    bg_toolbar = "#183c52"
+    bg_input = "#081c28"
+    text_input = "#f8fafc"
+    border_input = "#8b7ec8"
+    border_card = "rgba(180, 168, 224, 0.34)"
+    text_main = "#f5f7ff"
+    text_sub = "#c7d2fe"
+    accent = "#c4b5fd"
+    accent_soft = "rgba(196, 181, 253, 0.16)"
+    btn_sec_bg = "#14374d"
+    btn_sec_text = "#ffffff"
+    btn_sec_border = "#a594f9"
     ok_text = "#34d399"
     mod_text = "#fbbf24"
     crit_text = "#fb7185"
-    tile_shadow = "0 10px 26px rgba(0, 0, 0, 0.35)"
+    tile_shadow = "0 10px 26px rgba(4, 15, 24, 0.42)"
     map_style_choice = pdk.map_styles.CARTO_DARK
-    arc_inactive_color = [148, 163, 184, 95]
-    pin_label_color = [238, 241, 255, 255]
-    secondary_label_color = [148, 163, 184, 215]
-    state_border_color = [129, 140, 248, 140]
+    arc_inactive_color = [165, 180, 252, 105]
+    pin_label_color = [245, 247, 255, 255]
+    secondary_label_color = [199, 210, 254, 220]
+    state_border_color = [165, 180, 252, 155]
 
 st.markdown(
     f"""
@@ -174,20 +198,74 @@ html, body, .stApp {{
 }}
 
 .stApp {{
-    background-color: {bg_app} !important;
-    background-image:
-        linear-gradient(180deg, {bg_grad_top} 0%, {bg_app} 55%, {bg_grad_bottom} 100%),
-        radial-gradient(circle at 85% 5%, {accent_soft}, transparent 40%),
-        radial-gradient(circle at 5% 95%, rgba(6, 182, 212, 0.08), transparent 40%),
-        linear-gradient(to right, {grid_line} 1px, transparent 1px),
-        linear-gradient(to bottom, {grid_line} 1px, transparent 1px) !important;
-    background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+    background: {bg_app_mix} !important;
+    background-attachment: fixed !important;
     color: {text_main} !important;
 }}
 
 section[data-testid="stSidebar"] {{
-    background-color: {bg_card} !important;
-    border-right: 1px solid {border_card} !important;
+    background: {sidebar_bg} !important;
+    border-right: 1px solid {sidebar_border} !important;
+}}
+
+section[data-testid="stSidebar"] > div {{
+    background: transparent !important;
+}}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] div {{
+    color: {sidebar_text} !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {{
+    color: {sidebar_sub} !important;
+    font-weight: 700 !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stCheckbox"] > label {{
+    background: {sidebar_card_bg} !important;
+    border: 1px solid {sidebar_border} !important;
+    border-radius: 10px !important;
+    padding: 8px 10px !important;
+    width: 100% !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stMetric"] {{
+    background: {sidebar_card_bg} !important;
+    border: 1px solid {sidebar_border} !important;
+    border-radius: 12px !important;
+    padding: 10px 12px !important;
+    margin-bottom: 8px !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stMetricLabel"],
+section[data-testid="stSidebar"] [data-testid="stMetricLabel"] * {{
+    color: {sidebar_sub} !important;
+    font-weight: 700 !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stMetricValue"],
+section[data-testid="stSidebar"] [data-testid="stMetricValue"] * {{
+    color: {sidebar_text} !important;
+    font-weight: 800 !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stMetricDelta"] {{
+    background: {sidebar_delta_bg} !important;
+    border-radius: 999px !important;
+    padding: 2px 8px !important;
+}}
+
+section[data-testid="stSidebar"] [data-testid="stMetricDelta"],
+section[data-testid="stSidebar"] [data-testid="stMetricDelta"] * {{
+    color: {sidebar_delta_text} !important;
+    font-weight: 700 !important;
 }}
 
 [data-testid="stExpander"] summary {{
@@ -220,19 +298,6 @@ header[data-testid="stHeader"] {{
     background-color: transparent !important;
 }}
 
-div[data-baseweb="popover"],
-div[data-baseweb="popover"] *,
-div[data-baseweb="menu"],
-div[data-baseweb="menu"] li,
-div[style*="background: #ffffff"],
-div[style*="background:#ffffff"],
-div[style*="background-color: #ffffff"],
-div[style*="background-color:#ffffff"],
-div[style*="background: white"],
-div[style*="background-color: white"] {{
-    color: #000000 !important;
-}}
-
 [data-testid="stWidgetLabel"],
 [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] span,
@@ -262,6 +327,41 @@ div[data-testid="stCheckbox"] label {{
     opacity: 1 !important;
 }}
 
+/* Action & CSV Download Buttons — High Contrast in Both Modes */
+div[data-testid="stButton"] > button,
+div[data-testid="stDownloadButton"] > button {{
+    background-color: {btn_sec_bg} !important;
+    color: {btn_sec_text} !important;
+    border: 1.5px solid {btn_sec_border} !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+}}
+
+div[data-testid="stButton"] > button *,
+div[data-testid="stDownloadButton"] > button * {{
+    color: {btn_sec_text} !important;
+    fill: {btn_sec_text} !important;
+    opacity: 1 !important;
+}}
+
+div[data-testid="stButton"] > button:hover,
+div[data-testid="stDownloadButton"] > button:hover {{
+    border-color: {accent} !important;
+    filter: brightness(1.06);
+}}
+
+div[data-testid="stButton"] > button[kind="primary"] {{
+    background: linear-gradient(135deg, #0284c7 0%, #6d5dfc 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}}
+
+div[data-testid="stButton"] > button[kind="primary"] * {{
+    color: #ffffff !important;
+    fill: #ffffff !important;
+}}
+
 .hero {{
     display: flex;
     align-items: center;
@@ -279,8 +379,8 @@ div[data-testid="stCheckbox"] label {{
     font-size: 20px;
     font-weight: 800;
     color: #ffffff !important;
-    background: linear-gradient(135deg, #2563eb 0%, #0284c7 100%);
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+    background: linear-gradient(135deg, #0c2b3c 0%, #6b5b95 100%);
+    box-shadow: 0 8px 20px rgba(12, 43, 60, 0.28);
 }}
 
 .hero-title {{
@@ -304,7 +404,7 @@ div[data-testid="stCheckbox"] label {{
 
 .console-banner {{
     background: {bg_card} !important;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
     border: 1px solid {border_card} !important;
     border-radius: 14px;
     padding: 14px 18px 12px;
@@ -352,6 +452,7 @@ div[data-baseweb="menu"] li {{
     color: {text_input} !important;
 }}
 
+/* Number Input Box & Plus/Minus Stepper Buttons — Always High Contrast */
 div[data-testid="stNumberInput"] div[data-baseweb="input"],
 div[data-testid="stNumberInput"] input,
 div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {{
@@ -364,10 +465,11 @@ div[data-testid="stNumberInput"] button {{
     background-color: #ffffff !important;
     color: #000000 !important;
     border-color: {border_input} !important;
+    opacity: 1 !important;
 }}
 
 div[data-testid="stNumberInput"] button:hover {{
-    background-color: #f1f5f9 !important;
+    background-color: #e2e8f0 !important;
 }}
 
 div[data-testid="stNumberInput"] button svg,
@@ -387,7 +489,7 @@ div[data-testid="stDeckGlJsonChart"] {{
 
 .left-summary-card {{
     background: {bg_card} !important;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
     border: 1px solid {border_card} !important;
     border-radius: 14px;
     padding: 16px 18px;
@@ -470,7 +572,7 @@ div[data-testid="stDeckGlJsonChart"] {{
     padding: 10px 12px;
     border-radius: 10px;
     border: 1px solid {border_card};
-    background: rgba(14, 165, 233, 0.07);
+    background: {accent_soft};
     font-size: 12px;
     line-height: 1.45;
     color: {text_main} !important;
@@ -569,9 +671,9 @@ div[data-testid="stDeckGlJsonChart"] {{
 
 .tag-crit {{
     display: inline-block;
-    background: rgba(244, 63, 94, 0.14);
+    background: rgba(244, 63, 94, 0.16);
     color: {crit_text} !important;
-    border: 1px solid rgba(244, 63, 94, 0.50);
+    border: 1px solid rgba(244, 63, 94, 0.55);
     padding: 2px 10px;
     border-radius: 999px;
     font-size: 11px;
@@ -580,9 +682,9 @@ div[data-testid="stDeckGlJsonChart"] {{
 
 .tag-mod {{
     display: inline-block;
-    background: rgba(245, 158, 11, 0.14);
+    background: rgba(245, 158, 11, 0.16);
     color: {mod_text} !important;
-    border: 1px solid rgba(245, 158, 11, 0.50);
+    border: 1px solid rgba(245, 158, 11, 0.55);
     padding: 2px 10px;
     border-radius: 999px;
     font-size: 11px;
@@ -591,13 +693,28 @@ div[data-testid="stDeckGlJsonChart"] {{
 
 .tag-ok {{
     display: inline-block;
-    background: rgba(16, 185, 129, 0.14);
+    background: rgba(16, 185, 129, 0.16);
     color: {ok_text} !important;
-    border: 1px solid rgba(16, 185, 129, 0.50);
+    border: 1px solid rgba(16, 185, 129, 0.55);
     padding: 2px 10px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 800;
+}}
+
+.page2-sidebar-trigger {{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 10px;
+    background: {bg_card};
+    border: 1.5px solid {btn_sec_border};
+    color: {text_main};
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    box-shadow: {tile_shadow};
 }}
 </style>
 """,
@@ -657,7 +774,10 @@ def format_weather_condition(condition_text, precip_mm=0.0, wind_kmh=0.0):
 
 def get_terrain_profile(state_name: str, dist_km: float):
     state_upper = (state_name or "").upper()
-    himalayan = ["HIMACHAL PRADESH", "UTTARAKHAND", "JAMMU AND KASHMIR", "LADAKH", "SIKKIM", "ARUNACHAL PRADESH", "NAGALAND", "MANIPUR", "MIZORAM", "MEGHALAYA"]
+    himalayan = [
+        "HIMACHAL PRADESH", "UTTARAKHAND", "JAMMU AND KASHMIR", "LADAKH",
+        "SIKKIM", "ARUNACHAL PRADESH", "NAGALAND", "MANIPUR", "MIZORAM", "MEGHALAYA"
+    ]
     ghats_plateau = ["KARNATAKA", "KERALA", "GOA", "MAHARASHTRA", "TELANGANA", "ANDHRA PRADESH"]
     coastal = ["TAMIL NADU", "ODISHA", "WEST BENGAL", "GUJARAT"]
 
@@ -745,7 +865,6 @@ def get_arrival_weather(hub_record, days):
 
 
 def get_prediction(payload, hub_record):
-    """Score via FastAPI /predict when reachable; otherwise fall back quietly."""
     weather = get_arrival_weather(hub_record, payload["scheduled_shipping_days"])
     body = dict(payload, weather_delay_penalty_pct=weather["penalty_pct"])
     try:
@@ -765,7 +884,6 @@ def get_prediction(payload, hub_record):
 
 
 def get_plus_one_day_what_if(payload, hub_record, current_total_pct):
-    """Run a +1 transit day comparison, including a sensible fallback buffer adjustment."""
     if payload["scheduled_shipping_days"] >= 6:
         return None
     next_days = payload["scheduled_shipping_days"] + 1
@@ -820,7 +938,6 @@ def run_and_store_assessment(hub_rec, qty, sales, price, mode, days):
 
 
 def generate_mitigation_action(active_status, payload, weather_info, active_hub):
-    """Generate context-aware dispatch mitigations based on risk level and order parameters."""
     if active_status == STATUS_CRITICAL:
         actions = []
         if payload["shipping_mode"] in ["Standard Class", "Second Class"]:
@@ -843,7 +960,7 @@ def generate_mitigation_action(active_status, payload, weather_info, active_hub)
             actions.append("Trigger priority lane clearance and alert destination hub operations.")
 
         return (
-            '<div class="mitigation-box" style="border-left: 4px solid #f43f5e; background: rgba(244, 63, 94, 0.12);">'
+            '<div class="mitigation-box" style="border-left: 4px solid #f43f5e; background: rgba(244, 63, 94, 0.14);">'
             '<div style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; font-size: 11px; color: #fb7185; margin-bottom: 6px;">'
             "🚨 Automated Risk Mitigation Protocol"
             "</div>"
@@ -860,7 +977,7 @@ def generate_mitigation_action(active_status, payload, weather_info, active_hub)
             note += "Verify hub loading cutoff times to avoid overnight holdover."
 
         return (
-            '<div class="mitigation-box" style="border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.12);">'
+            '<div class="mitigation-box" style="border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.14);">'
             '<div style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; font-size: 11px; color: #fbbf24; margin-bottom: 4px;">'
             "⚠️ Cautionary Dispatch Advisory"
             "</div>"
@@ -869,7 +986,7 @@ def generate_mitigation_action(active_status, payload, weather_info, active_hub)
         )
 
     return (
-        '<div class="mitigation-box" style="border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.10);">'
+        '<div class="mitigation-box" style="border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.14);">'
         '<div style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; font-size: 11px; color: #34d399; margin-bottom: 4px;">'
         "✅ Clear for Dispatch"
         "</div>"
@@ -964,14 +1081,41 @@ with c_run:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
+# Page 1: Completely hide sidebar & toggle buttons
+# Page 2: Show hamburger toggle button to open/close sidebar
 if nav_choice != "Network Corridor Intelligence":
     st.markdown(
         """
         <style>
+        section[data-testid="stSidebar"],
         [data-testid="stSidebarCollapseButton"],
         [data-testid="stExpandSidebarButton"] {
             display: none !important;
         }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stExpandSidebarButton"] {{
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background: {bg_card} !important;
+            color: {text_main} !important;
+            border: 1.5px solid {btn_sec_border} !important;
+            border-radius: 10px !important;
+        }}
+        [data-testid="stSidebarCollapseButton"] *,
+        [data-testid="stExpandSidebarButton"] * {{
+            color: {text_main} !important;
+            fill: {text_main} !important;
+            opacity: 1 !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -1030,30 +1174,31 @@ what_if_data = (
     else None
 )
 
-with st.sidebar:
-    st.markdown("### Model Validation & Weights")
-    show_model_sidebar = st.checkbox("Show ROC / Validation Metrics", value=False)
-    if show_model_sidebar:
-        metrics_data = load_model_metrics()
-        if metrics_data:
-            roc_auc = metrics_data.get("roc_auc", 0.0)
-            precision = metrics_data.get("precision", 0.0)
-            recall = metrics_data.get("recall", 0.0)
-            f1 = metrics_data.get("f1", 0.0)
-            best_iter = metrics_data.get("best_iteration", "N/A")
-            top_features = metrics_data.get("top_importances", {})
+if nav_choice == "Network Corridor Intelligence":
+    with st.sidebar:
+        st.markdown("### Model Validation & Weights")
+        show_model_sidebar = st.checkbox("Show ROC / Validation Metrics", value=False)
+        if show_model_sidebar:
+            metrics_data = load_model_metrics()
+            if metrics_data:
+                roc_auc = metrics_data.get("roc_auc", 0.0)
+                precision = metrics_data.get("precision", 0.0)
+                recall = metrics_data.get("recall", 0.0)
+                f1 = metrics_data.get("f1", 0.0)
+                best_iter = metrics_data.get("best_iteration", "N/A")
+                top_features = metrics_data.get("top_importances", {})
 
-            st.metric("ROC-AUC Score", f"{roc_auc:.3f}")
-            st.metric("Precision", f"{precision * 100:.1f}%")
-            st.metric("Recall", f"{recall * 100:.1f}%")
-            st.metric("F1 Score", f"{f1:.3f}", delta=f"Trees: {best_iter}")
+                st.metric("ROC-AUC Score", f"{roc_auc:.3f}")
+                st.metric("Precision", f"{precision * 100:.1f}%")
+                st.metric("Recall", f"{recall * 100:.1f}%")
+                st.metric("F1 Score", f"{f1:.3f}", delta=f"Trees: {best_iter}")
 
-            if top_features:
-                st.caption("Top Predictive Feature Weights")
-                for feat, weight in list(top_features.items())[:5]:
-                    st.write(f"**{feat}:** {weight * 100.0:.1f}%")
-        else:
-            st.caption("No local metrics.json found.")
+                if top_features:
+                    st.caption("Top Predictive Feature Weights")
+                    for feat, weight in list(top_features.items())[:5]:
+                        st.write(f"**{feat}:** {weight * 100.0:.1f}%")
+            else:
+                st.caption("No local metrics.json found.")
 
 
 def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_scored=False):
@@ -1262,7 +1407,7 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
                 get_size=10,
                 get_pixel_offset="offset",
                 background=True,
-                get_background_color=[20, 27, 59, 175] if theme_mode != "Light Mode" else [255, 255, 255, 200],
+                get_background_color=[16, 44, 62, 190] if theme_mode != "Light Mode" else [255, 253, 248, 210],
                 get_border_color=[0, 0, 0, 0],
             )
         )
@@ -1277,7 +1422,7 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
             get_size=13,
             get_pixel_offset="offset",
             background=True,
-            get_background_color=[20, 27, 59, 215] if theme_mode != "Light Mode" else [255, 255, 255, 230],
+            get_background_color=[16, 44, 62, 225] if theme_mode != "Light Mode" else [255, 253, 248, 235],
             get_border_color=state_border_color,
             get_border_width=1,
         )
@@ -1300,6 +1445,11 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
 
 
 def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None, qty=1, sales=50.0):
+    st.markdown(
+        '<div class="page2-sidebar-trigger">☰ Use the top-left sidebar toggle to view Model Validation &amp; Weights</div>',
+        unsafe_allow_html=True,
+    )
+
     all_corridor_stats = []
     for rec in get_all_city_records():
         city_weather = get_arrival_weather(rec, committed_days)
