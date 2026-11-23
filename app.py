@@ -1255,11 +1255,11 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
 
 
 def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None, qty=1, sales=50.0):
-    corridor_stats = []
+    all_corridor_stats = []
     for rec in get_all_city_records():
         city_weather = get_arrival_weather(rec, committed_days)
         city_total_pct = min(round(rec["base_risk"] + city_weather["penalty_pct"], 1), 100.0)
-        corridor_stats.append(
+        all_corridor_stats.append(
             {
                 "state": rec["state"],
                 "city": rec["city"],
@@ -1272,16 +1272,16 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
 
     flagged_cities = [
         f"{row['city']} ({row['state']})"
-        for row in corridor_stats
+        for row in all_corridor_stats
         if row["status"] == STATUS_CRITICAL
     ]
-    avg_total_pct = sum(r["total_pct"] for r in corridor_stats) / max(len(corridor_stats), 1)
+    avg_total_pct = sum(r["total_pct"] for r in all_corridor_stats) / max(len(all_corridor_stats), 1)
     avg_status = status_from_risk(avg_total_pct)
 
     k1, k2, k3 = st.columns(3)
     with k1:
         st.markdown(
-            metric_tile("Tracked Hubs", str(len(corridor_stats)), "Across all 28 Indian states", accent),
+            metric_tile("Tracked Hubs", str(len(all_corridor_stats)), "Across all 28 Indian states", accent),
             unsafe_allow_html=True,
         )
     with k2:
@@ -1324,8 +1324,43 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
             unsafe_allow_html=True,
         )
 
+    # Multi-Hub Filtering & Sorting Controls
+    st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
+    f_col1, f_col2 = st.columns([3, 2])
+    with f_col1:
+        hub_filter = st.radio(
+            "Filter Corridors",
+            ["All Hubs", "Critical Risk Only", "Severe Weather"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+    with f_col2:
+        hub_sort = st.selectbox(
+            "Sort Order",
+            ["Highest Risk %", "Furthest Distance", "State / City (A-Z)"],
+            label_visibility="collapsed",
+        )
+
+    # Apply Filter
+    filtered_hubs = all_corridor_stats
+    if hub_filter == "Critical Risk Only":
+        filtered_hubs = [h for h in filtered_hubs if h["status"] == STATUS_CRITICAL]
+    elif hub_filter == "Severe Weather":
+        filtered_hubs = [
+            h for h in filtered_hubs
+            if (h["weather"]["precip"] >= 15.0 or h["weather"]["wind"] >= 25.0)
+        ]
+
+    # Apply Sort
+    if hub_sort == "Highest Risk %":
+        filtered_hubs = sorted(filtered_hubs, key=lambda x: x["total_pct"], reverse=True)
+    elif hub_sort == "Furthest Distance":
+        filtered_hubs = sorted(filtered_hubs, key=lambda x: x["dist"], reverse=True)
+    else:
+        filtered_hubs = sorted(filtered_hubs, key=lambda x: (x["state"], x["city"]))
+
     rows_html = ""
-    for row in corridor_stats[:20]:
+    for row in filtered_hubs[:25]:
         tag = f'<span class="{STATUS_TAG_CLASS[row["status"]]}">{row["status"]}</span>'
         risk_cell = (
             f'<strong>{row["total_pct"]:.0f}%</strong>'
@@ -1344,9 +1379,12 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
             f"</tr>"
         )
 
+    if not rows_html:
+        rows_html = f"<tr><td colspan='5' style='text-align:center; color:{text_sub}; padding:18px;'>No corridors match the selected filter.</td></tr>"
+
     st.markdown(
         f'<div class="intel-card">'
-        f'<div class="card-title">28-State Corridor Telemetry Snapshot (Top 20 Hubs)</div>'
+        f'<div class="card-title">28-State Corridor Telemetry Snapshot (Showing {len(filtered_hubs[:25])} of {len(filtered_hubs)} Matching Hubs)</div>'
         f'<table class="intel-table">'
         f"<thead><tr><th>Corridor</th><th>Distance</th><th>Condition</th><th>Risk</th><th>Status</th></tr></thead>"
         f"<tbody>{rows_html}</tbody>"
