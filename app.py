@@ -1324,7 +1324,6 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
             unsafe_allow_html=True,
         )
 
-    # Multi-Hub Filtering & Sorting Controls
     st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
     f_col1, f_col2 = st.columns([3, 2])
     with f_col1:
@@ -1341,7 +1340,6 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
             label_visibility="collapsed",
         )
 
-    # Apply Filter
     filtered_hubs = all_corridor_stats
     if hub_filter == "Critical Risk Only":
         filtered_hubs = [h for h in filtered_hubs if h["status"] == STATUS_CRITICAL]
@@ -1351,7 +1349,6 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
             if (h["weather"]["precip"] >= 15.0 or h["weather"]["wind"] >= 25.0)
         ]
 
-    # Apply Sort
     if hub_sort == "Highest Risk %":
         filtered_hubs = sorted(filtered_hubs, key=lambda x: x["total_pct"], reverse=True)
     elif hub_sort == "Furthest Distance":
@@ -1559,6 +1556,38 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                     next_d,
                 )
                 st.rerun()
+
+    # Feature 3: Export Dispatch Manifest (CSV Download)
+    if current_pred:
+        st.write("")
+        manifest_record = {
+            "dispatch_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "origin_hub": ORIGIN_HUB,
+            "destination_city": active_hub_rec["city"],
+            "destination_state": active_hub_rec["state"],
+            "distance_km": active_hub_rec["dist"],
+            "shipping_mode": current_mode,
+            "scheduled_transit_days": current_days,
+            "order_quantity": order_quantity,
+            "sales_per_customer_usd": sales_per_customer,
+            "total_order_value_usd": round(sales_per_customer * order_quantity, 2),
+            "ml_base_risk_pct": base_pct_val,
+            "weather_penalty_pct": weather_pct,
+            "total_risk_pct": active_total_pct,
+            "sla_risk_status": active_status,
+            "gate_release_authorization": (
+                "AUTHORIZED" if active_status == STATUS_STABLE else "PRIORITY CLEARANCE REQUIRED"
+            ),
+        }
+        manifest_df = pd.DataFrame([manifest_record])
+        manifest_csv = manifest_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Export Dispatch Manifest (CSV)",
+            data=manifest_csv,
+            file_name=f"cargosense_manifest_{active_hub_rec['city'].lower()}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
     return active_status
 
