@@ -20,6 +20,7 @@ from states_cities import (
     get_all_city_records,
     get_hub_record,
 )
+from weather_utils import get_arrival_weather as fetch_arrival_weather
 
 st.set_page_config(
     page_title="CargoSense — 3D Telemetry & Route Analysis",
@@ -758,7 +759,11 @@ METRICS_FILE = Path(__file__).parent / "models" / "metrics.json"
 
 
 def format_weather_condition(condition_text, precip_mm=0.0, wind_kmh=0.0):
+    precip_mm = precip_mm or 0.0
+    wind_kmh = wind_kmh or 0.0
     upper_cond = (condition_text or "").upper()
+    if upper_cond == "UNAVAILABLE":
+        return "Forecast unavailable"
     if "STORM" in upper_cond or "THUNDER" in upper_cond or (precip_mm >= 24.0 and wind_kmh >= 35.0):
         emoji = "⛈️"
     elif "RAIN" in upper_cond or precip_mm > 5.0:
@@ -853,7 +858,11 @@ def validate_inputs(order_quantity, scheduled_shipping_days, sales_per_customer,
     return errors
 
 
-def get_arrival_weather(hub_record, days):
+def show(value, unit=""):
+    return "n/a" if value is None else f"{value}{unit}"
+
+
+def get_static_weather(hub_record, days):
     return {
         "precip": hub_record["precip"],
         "wind": hub_record["wind"],
@@ -861,6 +870,21 @@ def get_arrival_weather(hub_record, days):
         "condition": hub_record["weather"],
         "forecast_date": datetime.now() + timedelta(days=days),
         "penalty_pct": hub_record["weather_penalty"],
+    }
+
+
+def get_arrival_weather(hub_record, days):
+    longitude, latitude = hub_record["coords"]
+    result = fetch_arrival_weather(latitude, longitude, int(days))
+    return {
+        "available": result["available"],
+        "reason": result["reason"],
+        "precip": result["precip_mm"],
+        "wind": result["wind_kmh"],
+        "temp_c": result["temp_c"],
+        "condition": result["condition"],
+        "forecast_date": result["forecast_date"],
+        "penalty_pct": result["penalty"]["total"],
     }
 
 
@@ -944,7 +968,7 @@ def generate_mitigation_action(active_status, payload, weather_info, active_hub)
             actions.append(
                 "Divert to <strong>First Class / Air Express</strong> to compress line-haul transit by 24–48 hours."
             )
-        if weather_info["precip"] > 15.0 or weather_info["wind"] > 30.0:
+        if (weather_info["precip"] or 0.0) > 15.0 or (weather_info["wind"] or 0.0) > 30.0:
             actions.append(
                 f"Hold dispatch gate release for <strong>8–12 hours</strong> until severe weather ({format_weather_condition(weather_info['condition'], weather_info['precip'], weather_info['wind'])}) eases."
             )
@@ -1452,7 +1476,7 @@ def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None,
 
     all_corridor_stats = []
     for rec in get_all_city_records():
-        city_weather = get_arrival_weather(rec, committed_days)
+        city_weather = get_static_weather(rec, committed_days)
         city_total_pct = min(round(rec["base_risk"] + city_weather["penalty_pct"], 1), 100.0)
         all_corridor_stats.append(
             {
@@ -1616,6 +1640,8 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
         return STATUS_MODERATE
 
     weather_info = get_arrival_weather(active_hub_rec, current_days)
+    if not weather_info["available"]:
+        st.warning("Arrival-day forecast unavailable. No weather penalty is applied.")
     weather_pct = (
         current_pred["weather_delay_penalty_pct"]
         if current_pred
@@ -1720,11 +1746,11 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
             </div>
             <div class="left-stat-row">
                 <span class="left-stat-label">Rainfall / Wind</span>
-                <span class="left-stat-val">{weather_info["precip"]} mm · {weather_info["wind"]} km/h</span>
+                <span class="left-stat-val">{show(weather_info["precip"], " mm")} · {show(weather_info["wind"], " km/h")}</span>
             </div>
             <div class="left-stat-row">
                 <span class="left-stat-label">Temperature</span>
-                <span class="left-stat-val">{weather_info["temp_c"]} °C</span>
+                <span class="left-stat-val">{show(weather_info["temp_c"], " °C")}</span>
             </div>
             <div class="left-stat-row">
                 <span class="left-stat-label">Est. Arrival</span>
