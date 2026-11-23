@@ -95,37 +95,39 @@ with top_col2:
     theme_mode = st.radio(
         "Display Theme",
         ["Dark Mode", "Light Mode"],
-        index=0,
+        index=1,
         horizontal=True,
         label_visibility="collapsed",
     )
 
 if theme_mode == "Light Mode":
-    bg_app = "#f2f4fb"
-    bg_header = "#f2f4fb"
-    bg_card = "#ffffff"
-    bg_toolbar = "#e6e9f6"
+    bg_app = "#e9f2fc"
+    bg_grad_top = "#eff6ff"
+    bg_grad_bottom = "#dbeafe"
+    bg_card = "rgba(255, 255, 255, 0.92)"
+    bg_toolbar = "#dbeafe"
     bg_input = "#ffffff"
-    text_input = "#14172e"
-    border_input = "#8b93c4"
-    border_card = "#dde1f0"
-    text_main = "#14172e"
-    text_sub = "#5a6183"
-    grid_line = "rgba(79, 70, 229, 0.05)"
-    accent = "#5b5bf0"
-    accent_soft = "rgba(91, 91, 240, 0.12)"
+    text_input = "#0f172a"
+    border_input = "#94a3b8"
+    border_card = "#bfd7f2"
+    text_main = "#0f172a"
+    text_sub = "#475569"
+    grid_line = "rgba(2, 132, 199, 0.05)"
+    accent = "#1d4ed8"
+    accent_soft = "rgba(29, 78, 216, 0.10)"
     ok_text = "#047857"
     mod_text = "#b45309"
     crit_text = "#be123c"
-    tile_shadow = "0 8px 22px rgba(40, 50, 120, 0.10)"
+    tile_shadow = "0 8px 22px rgba(30, 64, 175, 0.08)"
     map_style_choice = pdk.map_styles.CARTO_LIGHT
     arc_inactive_color = [100, 116, 139, 95]
-    pin_label_color = [20, 23, 46, 255]
+    pin_label_color = [15, 23, 42, 255]
     secondary_label_color = [71, 85, 105, 220]
-    state_border_color = [91, 100, 150, 170]
+    state_border_color = [51, 92, 129, 165]
 else:
     bg_app = "#0a0f24"
-    bg_header = "#0a0f24"
+    bg_grad_top = "#0a0f24"
+    bg_grad_bottom = "#070b1a"
     bg_card = "#141b3b"
     bg_toolbar = "#1b2450"
     bg_input = "#0b1026"
@@ -152,31 +154,79 @@ st.markdown(
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
 
-html, body, .stApp, .stApp * {{
+html, body, .stApp {{
     font-family: 'Inter', 'Segoe UI', sans-serif;
+}}
+
+.stApp *:not([data-testid="stIconMaterial"]):not([data-testid="stSidebarCollapseButton"] *):not([data-testid="stExpandSidebarButton"] *):not([class*="material-icons"]):not([class*="MaterialIcon"]) {{
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+}}
+
+[data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapseButton"] span,
+[data-testid="stExpandSidebarButton"] span {{
+    font-family: 'Material Symbols Rounded', 'Material Icons' !important;
 }}
 
 .stApp {{
     background-color: {bg_app} !important;
     background-image:
+        linear-gradient(180deg, {bg_grad_top} 0%, {bg_app} 55%, {bg_grad_bottom} 100%),
         radial-gradient(circle at 85% 5%, {accent_soft}, transparent 40%),
         radial-gradient(circle at 5% 95%, rgba(6, 182, 212, 0.08), transparent 40%),
         linear-gradient(to right, {grid_line} 1px, transparent 1px),
         linear-gradient(to bottom, {grid_line} 1px, transparent 1px) !important;
-    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
     color: {text_main} !important;
+}}
+
+section[data-testid="stSidebar"] {{
+    background-color: {bg_card} !important;
+    border-right: 1px solid {border_card} !important;
+}}
+
+[data-testid="stExpander"] summary {{
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}}
+
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span:not([data-testid="stIconMaterial"]) {{
+    margin: 0 !important;
+    line-height: 1.35 !important;
 }}
 
 .block-container {{
-    padding-top: 3.5rem !important;
+    padding-top: 2.2rem !important;
     max-width: 1520px !important;
 }}
 
-header[data-testid="stHeader"],
+header[data-testid="stHeader"] {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border-bottom: none !important;
+    color: {text_main} !important;
+}}
+
 [data-testid="stToolbar"],
 [data-testid="stDecoration"] {{
-    background-color: {bg_header} !important;
-    color: {text_main} !important;
+    background: transparent !important;
+    background-color: transparent !important;
+}}
+
+/* Ensure any light/white-background container or popover has crisp black/dark text */
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] *,
+div[data-baseweb="menu"],
+div[data-baseweb="menu"] li,
+div[style*="background: #ffffff"],
+div[style*="background:#ffffff"],
+div[style*="background-color: #ffffff"],
+div[style*="background-color:#ffffff"],
+div[style*="background: white"],
+div[style*="background-color: white"] {{
+    color: #000000 !important;
 }}
 
 [data-testid="stWidgetLabel"],
@@ -191,9 +241,7 @@ div[data-testid="stRadio"] label p,
 div[data-testid="stRadio"] label span,
 div[data-testid="stCheckbox"] label,
 div[data-testid="stCheckbox"] label p,
-div[data-testid="stCheckbox"] label span,
-.stMarkdown p,
-.stMarkdown span {{
+div[data-testid="stCheckbox"] label span {{
     color: {text_main} !important;
 }}
 
@@ -227,8 +275,8 @@ div[data-testid="stCheckbox"] label {{
     font-size: 20px;
     font-weight: 800;
     color: #ffffff !important;
-    background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
-    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.40);
+    background: linear-gradient(135deg, #2563eb 0%, #0284c7 100%);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
 }}
 
 .hero-title {{
@@ -252,9 +300,10 @@ div[data-testid="stCheckbox"] label {{
 
 .console-banner {{
     background: {bg_card} !important;
+    backdrop-filter: blur(8px);
     border: 1px solid {border_card} !important;
     border-radius: 14px;
-    padding: 14px 18px 10px;
+    padding: 14px 18px 12px;
     margin-bottom: 16px;
     box-shadow: {tile_shadow};
 }}
@@ -321,6 +370,7 @@ div[data-testid="stDeckGlJsonChart"] {{
 
 .left-summary-card {{
     background: {bg_card} !important;
+    backdrop-filter: blur(8px);
     border: 1px solid {border_card} !important;
     border-radius: 14px;
     padding: 16px 18px;
@@ -382,6 +432,17 @@ div[data-testid="stDeckGlJsonChart"] {{
     margin-top: 10px;
     padding: 10px 12px;
     border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: {text_main} !important;
+}}
+
+.whatif-box {{
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid {border_card};
+    background: {accent_soft};
     font-size: 12px;
     line-height: 1.45;
     color: {text_main} !important;
@@ -621,15 +682,14 @@ def get_arrival_weather(hub_record, days):
 
 
 def get_prediction(payload, hub_record):
-    """Score via FastAPI /predict when reachable; otherwise fall back cleanly."""
+    """Score via FastAPI /predict when reachable; otherwise fall back quietly."""
     weather = get_arrival_weather(hub_record, payload["scheduled_shipping_days"])
     body = dict(payload, weather_delay_penalty_pct=weather["penalty_pct"])
     try:
         res = requests.post(f"{API_URL}/predict", json=body, timeout=8)
         res.raise_for_status()
-        return dict(res.json(), scored_at=datetime.now().strftime("%H:%M:%S IST"), source="model")
-    except requests.RequestException as exc:
-        st.warning(f"FastAPI unreachable ({exc.__class__.__name__}); using corridor estimate.")
+        return dict(res.json(), source="model")
+    except requests.RequestException:
         total_pct = min(round(hub_record["base_risk"] + weather["penalty_pct"], 1), 100.0)
         return {
             "late_delivery_risk_prob": round(total_pct / 100.0, 4),
@@ -637,9 +697,24 @@ def get_prediction(payload, hub_record):
             "base_risk_pct": round(total_pct - weather["penalty_pct"], 1),
             "weather_delay_penalty_pct": weather["penalty_pct"],
             "status": status_from_risk(total_pct),
-            "scored_at": datetime.now().strftime("%H:%M:%S IST"),
             "source": "fallback",
         }
+
+
+def get_plus_one_day_what_if(payload, hub_record, current_total_pct):
+    """Run a simple +1 transit day comparison using the same prediction function."""
+    if payload["scheduled_shipping_days"] >= 6:
+        return None
+    next_days = payload["scheduled_shipping_days"] + 1
+    next_payload = dict(payload, scheduled_shipping_days=next_days)
+    next_pred = get_prediction(next_payload, hub_record)
+    next_total_pct = round(next_pred["late_delivery_risk_prob"] * 100.0, 1)
+    diff_pct = round(next_total_pct - current_total_pct, 1)
+    return {
+        "next_days": next_days,
+        "next_total_pct": next_total_pct,
+        "diff_pct": diff_pct,
+    }
 
 
 def generate_mitigation_action(active_status, payload, weather_info, active_hub):
@@ -780,6 +855,20 @@ with c_run:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
+# Hide sidebar toggle on Page 1; only show it on Page 2 (Network Corridor Intelligence)
+if nav_choice != "Network Corridor Intelligence":
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stExpandSidebarButton"] {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 active_hub = (
     get_hub_record(selected_state, selected_city)
     if (selected_state and selected_city)
@@ -809,10 +898,74 @@ if run_clicked:
             for err_msg in input_errors:
                 st.error(err_msg)
         else:
+            pred_result = get_prediction(current_payload, active_hub)
+            total_pct_val = round(pred_result["late_delivery_risk_prob"] * 100.0, 1)
+            what_if_result = get_plus_one_day_what_if(current_payload, active_hub, total_pct_val)
             st.session_state["prediction"] = {
                 "payload": current_payload,
-                "result": get_prediction(current_payload, active_hub),
+                "result": pred_result,
+                "what_if": what_if_result,
             }
+
+expected_payload = (
+    {
+        "order_quantity": int(order_quantity),
+        "sales_per_customer": float(sales_per_customer),
+        "product_price": float(product_price),
+        "shipping_mode": shipping_mode,
+        "scheduled_shipping_days": int(committed_days),
+        "destination_city": active_hub["city"],
+        "origin_hub": ORIGIN_HUB,
+    }
+    if active_hub
+    else None
+)
+
+stored_prediction = st.session_state.get("prediction")
+prediction = (
+    stored_prediction["result"]
+    if (
+        expected_payload
+        and stored_prediction
+        and stored_prediction.get("payload") == expected_payload
+    )
+    else None
+)
+what_if_data = (
+    stored_prediction.get("what_if")
+    if (
+        expected_payload
+        and stored_prediction
+        and stored_prediction.get("payload") == expected_payload
+    )
+    else None
+)
+
+# --- SIDEBAR: OPTIONAL MODEL VALIDATION & FEATURE WEIGHTS ---
+with st.sidebar:
+    st.markdown("### Model Validation & Weights")
+    show_model_sidebar = st.checkbox("Show ROC / Validation Metrics", value=False)
+    if show_model_sidebar:
+        metrics_data = load_model_metrics()
+        if metrics_data:
+            roc_auc = metrics_data.get("roc_auc", 0.0)
+            precision = metrics_data.get("precision", 0.0)
+            recall = metrics_data.get("recall", 0.0)
+            f1 = metrics_data.get("f1", 0.0)
+            best_iter = metrics_data.get("best_iteration", "N/A")
+            top_features = metrics_data.get("top_importances", {})
+
+            st.metric("ROC-AUC Score", f"{roc_auc:.3f}")
+            st.metric("Precision", f"{precision * 100:.1f}%")
+            st.metric("Recall", f"{recall * 100:.1f}%")
+            st.metric("F1 Score", f"{f1:.3f}", delta=f"Trees: {best_iter}")
+
+            if top_features:
+                st.caption("Top Predictive Feature Weights")
+                for feat, weight in list(top_features.items())[:5]:
+                    st.write(f"**{feat}:** {weight * 100.0:.1f}%")
+        else:
+            st.caption("No local metrics.json found.")
 
 
 def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_scored=False):
@@ -1058,7 +1211,7 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
     )
 
 
-def render_corridor_intelligence(committed_days):
+def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None, qty=1, sales=50.0):
     corridor_stats = []
     for rec in get_all_city_records():
         city_weather = get_arrival_weather(rec, committed_days)
@@ -1109,6 +1262,25 @@ def render_corridor_intelligence(committed_days):
             unsafe_allow_html=True,
         )
 
+    if hub_rec and scored_pred:
+        total_order_value = float(sales) * int(qty)
+        penalty_rate = 0.20
+        risk_prob = float(scored_pred["late_delivery_risk_prob"])
+        est_exposure = total_order_value * risk_prob * penalty_rate
+        expedite_cost = 45.0
+        roi_pct = ((est_exposure - expedite_cost) / expedite_cost) * 100.0 if expedite_cost > 0 else 0.0
+
+        st.markdown(
+            f'<div class="intel-card">'
+            f'<div class="card-title">Executive SLA &amp; Cost Impact · {ORIGIN_HUB} → {hub_rec["city"]} ({hub_rec["state"]})</div>'
+            f'<div style="display:flex; flex-wrap:wrap; gap:28px; font-size:13.5px;">'
+            f'<div><strong>Order Value:</strong> ${total_order_value:,.2f}</div>'
+            f'<div><strong>SLA Penalty Exposure (20%):</strong> <span style="color:{crit_text}; font-weight:700;">${est_exposure:,.2f}</span> ({risk_prob * 100.0:.1f}% risk)</div>'
+            f'<div><strong>Expedite Cost vs ROI:</strong> ${expedite_cost:,.0f} ({roi_pct:+.0f}% ROI)</div>'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
+
     rows_html = ""
     for row in corridor_stats[:20]:
         tag = f'<span class="{STATUS_TAG_CLASS[row["status"]]}">{row["status"]}</span>'
@@ -1139,220 +1311,167 @@ def render_corridor_intelligence(committed_days):
         unsafe_allow_html=True,
     )
 
-    metrics_data = load_model_metrics()
-    if metrics_data:
-        roc_auc = metrics_data.get("roc_auc", 0.0)
-        precision = metrics_data.get("precision", 0.0)
-        recall = metrics_data.get("recall", 0.0)
-        f1 = metrics_data.get("f1", 0.0)
-        best_iter = metrics_data.get("best_iteration", "N/A")
-        top_features = metrics_data.get("top_importances", {})
 
-        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-        with m_col1:
-            st.markdown(
-                metric_tile("ROC-AUC Score", f"{roc_auc:.3f}", "Test split cross-validated", accent),
-                unsafe_allow_html=True,
-            )
-        with m_col2:
-            st.markdown(
-                metric_tile("Precision", f"{precision * 100:.1f}%", "Flagged breach accuracy", ok_text),
-                unsafe_allow_html=True,
-            )
-        with m_col3:
-            st.markdown(
-                metric_tile("Recall", f"{recall * 100:.1f}%", "Late risk capture rate", mod_text),
-                unsafe_allow_html=True,
-            )
-        with m_col4:
-            st.markdown(
-                metric_tile("F1 Score", f"{f1:.3f}", f"Optimal trees: {best_iter}", crit_text),
-                unsafe_allow_html=True,
-            )
-
-        if top_features:
-            feature_rows = ""
-            for feat, weight in list(top_features.items())[:5]:
-                pct = weight * 100.0
-                feature_rows += (
-                    f"<tr>"
-                    f"<td><strong>{feat}</strong></td>"
-                    f"<td>{pct:.1f}%</td>"
-                    f"<td><span class='mini-bar' style='width:160px;'>"
-                    f"<div style='width:{min(pct, 100.0)}%; background:{accent};'></div>"
-                    f"</span></td>"
-                    f"</tr>"
-                )
-
-            st.markdown(
-                f'<div class="intel-card">'
-                f'<div class="card-title">XGBoost Top Predictive Feature Weights</div>'
-                f'<table class="intel-table">'
-                f"<thead><tr><th>Feature</th><th>Weight</th><th>Relative Influence</th></tr></thead>"
-                f"<tbody>{feature_rows}</tbody>"
-                f"</table></div>",
-                unsafe_allow_html=True,
-            )
-    else:
-        st.info("XGBoost classifier artifacts loaded via FastAPI /predict endpoint.")
-
-
-# --- LEFT COLUMN (SUMMARY) + RIGHT COLUMN (MAP / CORRIDOR INTEL) ---
-left_col, right_col = st.columns([1.15, 2.35], gap="medium")
-
-if not active_hub:
-    with left_col:
+def render_shipment_summary_card(active_hub_rec, current_days, current_mode, current_pred, current_what_if):
+    if not active_hub_rec:
         st.markdown(
             f"""
             <div class="left-summary-card">
                 <div class="left-summary-head">
                     <span class="left-summary-title">Shipment Risk Summary</span>
-                    <span class="tag-mod">Awaiting Corridor</span>
+                    <span class="tag-mod">Awaiting Selection</span>
                 </div>
                 <div class="left-summary-route" style="color: {text_sub};">
                     From {ORIGIN_HUB} → Select Destination
                 </div>
-                <p style="font-size: 13px; color: {text_sub}; line-height: 1.6; margin-top: 10px;">
-                    Select a <strong>Destination State</strong> and <strong>Destination City</strong> from the console above to inspect route distance and weather conditions, then click <strong>Run Risk Assessment</strong> to score the order.
-                </p>
+                <div class="left-stat-row"><span class="left-stat-label">ML Total Risk</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">ML Base Risk</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Weather Penalty</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Route Distance</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Shipping Mode</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Conditions</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Rainfall / Wind</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Temperature</span><span class="left-stat-val">--</span></div>
+                <div class="left-stat-row"><span class="left-stat-label">Est. Arrival</span><span class="left-stat-val">--</span></div>
+                <div class="left-advisory">
+                    Select a <strong>Destination State</strong> and <strong>Destination City</strong> above, then click <strong>Run Risk Assessment</strong>.
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        return STATUS_MODERATE
 
-    with right_col:
-        if nav_choice == "Pre-Dispatch Risk Simulator":
-            deck = build_clean_map_deck(get_all_city_records())
-            st.pydeck_chart(deck, width="stretch", height=540)
-        else:
-            render_corridor_intelligence(committed_days)
-
-else:
-    active_weather = get_arrival_weather(active_hub, committed_days)
-
-    expected_payload = {
-        "order_quantity": int(order_quantity),
-        "sales_per_customer": float(sales_per_customer),
-        "product_price": float(product_price),
-        "shipping_mode": shipping_mode,
-        "scheduled_shipping_days": int(committed_days),
-        "destination_city": active_hub["city"],
-        "origin_hub": ORIGIN_HUB,
-    }
-
-    stored_prediction = st.session_state.get("prediction")
-    prediction = (
-        stored_prediction["result"]
-        if (stored_prediction and stored_prediction.get("payload") == expected_payload)
-        else None
-    )
-
+    weather_info = get_arrival_weather(active_hub_rec, current_days)
     weather_pct = (
-        prediction["weather_delay_penalty_pct"]
-        if prediction
-        else active_weather["penalty_pct"]
+        current_pred["weather_delay_penalty_pct"]
+        if current_pred
+        else weather_info["penalty_pct"]
     )
 
-    if prediction:
-        active_total_pct = round(prediction["late_delivery_risk_prob"] * 100.0, 1)
-        base_pct_val = round(prediction["base_risk_pct"], 1)
+    if current_pred:
+        active_total_pct = round(current_pred["late_delivery_risk_prob"] * 100.0, 1)
+        base_pct_val = round(current_pred["base_risk_pct"], 1)
         active_status = status_from_risk(active_total_pct)
         total_display = f"{active_total_pct:.1f}%"
         base_display = f"{base_pct_val:.1f}%"
         total_color = STATUS_COLORS[active_status]
         status_badge = f'<span class="{STATUS_TAG_CLASS[active_status]}">{active_status}</span>'
-        score_note = f"Scored via API at {prediction.get('scored_at', 'now')}"
     else:
         active_status = status_from_risk(
-            min(round(active_hub["base_risk"] + weather_pct, 1), 100.0)
+            min(round(active_hub_rec["base_risk"] + weather_pct, 1), 100.0)
         )
         total_display = "Pending"
         base_display = "Pending"
         total_color = text_sub
         status_badge = '<span class="tag-mod">READY TO SCORE</span>'
-        score_note = "Corridor preview loaded — click Run Risk Assessment to score"
 
-    forecast_date_text = active_weather["forecast_date"].strftime("%d %b %Y")
+    forecast_date_text = weather_info["forecast_date"].strftime("%d %b %Y")
     weather_display = format_weather_condition(
-        active_weather["condition"], active_weather["precip"], active_weather["wind"]
+        weather_info["condition"], weather_info["precip"], weather_info["wind"]
     )
 
+    what_if_html = ""
+    if current_pred and current_what_if:
+        delta_sign = "+" if current_what_if["diff_pct"] > 0 else ""
+        what_if_html = (
+            '<div class="whatif-box">'
+            f'<strong>What-If (+1 Transit Day → {current_what_if["next_days"]}d):</strong> '
+            f'Projected risk moves from <strong>{active_total_pct:.1f}%</strong> to '
+            f'<strong>{current_what_if["next_total_pct"]:.1f}%</strong> '
+            f'({delta_sign}{current_what_if["diff_pct"]:.1f}%).'
+            "</div>"
+        )
+
     mitigation_html = (
-        generate_mitigation_action(active_status, expected_payload, active_weather, active_hub)
-        if prediction
+        generate_mitigation_action(active_status, expected_payload, weather_info, active_hub_rec)
+        if current_pred
         else (
             f'<div class="mitigation-box" style="border-left: 4px solid {accent}; background: {accent_soft};">'
             f'<div style="font-size: 12px; color: {text_main};">'
-            "💡 <em>Click <strong>Run Risk Assessment</strong> to generate dynamic mitigation suggestions.</em>"
+            "💡 <em>Click <strong>Run Risk Assessment</strong> to generate risk scoring, what-if comparison, and mitigation advice.</em>"
             "</div></div>"
         )
     )
 
-    with left_col:
-        st.markdown(
-            f"""
-            <div class="left-summary-card">
-                <div class="left-summary-head">
-                    <span class="left-summary-title">Shipment Risk Summary</span>
-                    {status_badge}
-                </div>
-                <div class="left-summary-route">
-                    Delhi HQ → {active_hub["city"]}, {active_hub["state"]} · {committed_days}d window
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">ML Total Risk</span>
-                    <span class="left-stat-val" style="color: {total_color};">{total_display}</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">ML Base Risk</span>
-                    <span class="left-stat-val">{base_display}</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Weather Penalty</span>
-                    <span class="left-stat-val" style="color: {crit_text if weather_pct > 0 else text_main};">+{weather_pct:.1f}%</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Route Distance</span>
-                    <span class="left-stat-val">{active_hub["dist"]:,.0f} km</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Shipping Mode</span>
-                    <span class="left-stat-val">{shipping_mode}</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Conditions</span>
-                    <span class="left-stat-val">{weather_display}</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Rainfall / Wind</span>
-                    <span class="left-stat-val">{active_weather["precip"]} mm · {active_weather["wind"]} km/h</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Temperature</span>
-                    <span class="left-stat-val">{active_weather["temp_c"]} °C</span>
-                </div>
-                <div class="left-stat-row">
-                    <span class="left-stat-label">Est. Arrival</span>
-                    <span class="left-stat-val">{forecast_date_text}</span>
-                </div>
-                <div class="left-advisory">
-                    <strong>{score_note}:</strong><br/>
-                    {active_hub["advisory"]}
-                </div>
-                {mitigation_html}
+    st.markdown(
+        f"""
+        <div class="left-summary-card">
+            <div class="left-summary-head">
+                <span class="left-summary-title">Shipment Risk Summary</span>
+                {status_badge}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <div class="left-summary-route">
+                Delhi HQ → {active_hub_rec["city"]}, {active_hub_rec["state"]} · {current_days}d window
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">ML Total Risk</span>
+                <span class="left-stat-val" style="color: {total_color};">{total_display}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">ML Base Risk</span>
+                <span class="left-stat-val">{base_display}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Weather Penalty</span>
+                <span class="left-stat-val" style="color: {crit_text if weather_pct > 0 else text_main};">+{weather_pct:.1f}%</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Route Distance</span>
+                <span class="left-stat-val">{active_hub_rec["dist"]:,.0f} km</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Shipping Mode</span>
+                <span class="left-stat-val">{current_mode}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Conditions</span>
+                <span class="left-stat-val">{weather_display}</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Rainfall / Wind</span>
+                <span class="left-stat-val">{weather_info["precip"]} mm · {weather_info["wind"]} km/h</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Temperature</span>
+                <span class="left-stat-val">{weather_info["temp_c"]} °C</span>
+            </div>
+            <div class="left-stat-row">
+                <span class="left-stat-label">Est. Arrival</span>
+                <span class="left-stat-val">{forecast_date_text}</span>
+            </div>
+            {what_if_html}
+            <div class="left-advisory">
+                {active_hub_rec["advisory"]}
+            </div>
+            {mitigation_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return active_status
 
+
+# --- ROUTE BY WORKSPACE VIEW (STRICTLY 2 OPERATIONAL PAGES) ---
+if nav_choice == "Pre-Dispatch Risk Simulator":
+    left_col, right_col = st.columns([1.15, 2.35], gap="medium")
+    with left_col:
+        current_status = render_shipment_summary_card(
+            active_hub, committed_days, shipping_mode, prediction, what_if_data
+        )
     with right_col:
-        if nav_choice == "Pre-Dispatch Risk Simulator":
-            deck = build_clean_map_deck(
-                get_all_city_records(),
-                active_hub=active_hub,
-                active_status=active_status,
-                is_scored=prediction is not None,
-            )
-            st.pydeck_chart(deck, width="stretch", height=540)
-        else:
-            render_corridor_intelligence(committed_days)
+        deck = build_clean_map_deck(
+            get_all_city_records(),
+            active_hub=active_hub,
+            active_status=current_status if active_hub else None,
+            is_scored=prediction is not None,
+        )
+        st.pydeck_chart(deck, width="stretch", height=540)
+else:
+    render_corridor_intelligence(
+        committed_days,
+        hub_rec=active_hub,
+        scored_pred=prediction,
+        qty=order_quantity,
+        sales=sales_per_customer,
+    )
