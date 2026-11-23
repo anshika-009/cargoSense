@@ -1,45 +1,299 @@
 # CargoSense Dev Log
 
-A running record of what changed and why. Newest entry on top.
+A record of what we built, why, and what we rejected, organised by feature. Within each section, log entries are newest first.
 
-## How to Write an Entry
+## How to Update
 
-- Add the entry in the same commit or PR as the code, with a `docs:` commit if it is docs only.
-- Use real numbers only (metrics, split, thresholds), copied from script output. Never estimate.
-- Log any change to the API contract (field names, status strings, units) and tell the teammate who consumes it.
-- Update the team doc open-items checklist when an item is resolved.
-- Keep entries short: a few lines per field.
+- Add a dated line to the feature's **Log** in the same commit or PR as the code (`docs:` commit if docs only).
+- If a decision changes, update **Why** and **Alternatives considered**, and note the change in the Log.
+- Use real numbers only, copied from script output. Never estimate.
+- Log any API contract change (field names, status strings, units) and tell whoever consumes it.
+- New feature: copy the section layout (Status, What, Why, Alternatives considered, Log, Open).
 
-**Template**
+## Contents
 
-```
-## YYYY-MM-DD | branch-name | owner
-Done: what was built or changed
-Files: files touched
-Decisions: choices made and why
-Open: anything unresolved or to verify
-
-## 2026-11-21 | feature/ui | AgentRob0
-Done: Replaced CSV batch input with a single-order flow (sidebar inputs, `validate_inputs`, `get_prediction` stub, session-state results). Replaced map overlays with three cards below the map: arrival-day forecast, risk attribution, dispatch status. Added `status_from_risk` (65 and 35 thresholds) and `get_arrival_weather`. KPIs now computed from `INDIAN_HUBS`; fake metrics removed.
-Files: app.py
-Decisions: Results are tied to the exact payload, so any input change needs a re-run. Stub predicts late at 50% or more. Forecast date is today plus committed days. Run button moved above the sidebar panels.
-Open: Replace `get_prediction` with `requests.post` to FastAPI `/predict` and `get_arrival_weather` with Open-Meteo. Load real model metrics into the performance card. Check the map filter selector in the deployed Streamlit version.
-```
-
-## 2026-11-21 | feature/model-api | anshika-009
-
-Done: Added `EDA.py` to inspect the separate train and test files (shape, missing values, duplicates, target balance, categories, train vs test checks, leakage candidates) and saved the output to `eda_output.txt`.
-Files: EDA.py, eda_output.txt
-Decisions: Read with `latin-1`. Leakage columns are listed for manual review, not auto-dropped. Findings from the run: 144,415 train and 36,104 test rows, late share 0.5483 in both, no unseen categories, 23,645 shared `Order Id` values, `Market` late rate flat (0.543 to 0.554).
-Open: Shared order ids are handled in `model_training.py` by re-splitting. Check whether `Order Region` is worth a country-to-region mapping.
-
-## 2026-11-21 | feature/model-api | anshika-009
-
-Done: Added `feature_data.py` (11 model features, leakage guard, one-hot encoding, defaults) and `model_training.py` (grouped split, logistic and random forest baselines, XGBoost with early stopping, saves the four model files).
-Files: feature_data.py, model_training.py
-Decisions (add): Dropped `Benefit per order`: validation AUC 0.73928 with it, 0.73927 without, and the API never sends it. Test results (XGBoost, threshold 0.5): ROC-AUC 0.7426, accuracy 0.6940, F1 0.6578, precision 0.8500, recall 0.5365. Logistic regression (0.7425) and random forest (0.7412) score the same, so the signal is mostly shipping mode.
-Open (replace first sentence): Choose the dashboard threshold; recall at 0.5 is only 0.5365.
-Pooled train and test and re-split by `Order Id` (test 1/5, validation 1/6 of the rest), because 23,645 order ids were in both files and a plain test score would be inflated. Used `Market` instead of `Order Region` since the backend can derive it from the geocoded city (5 mapped values) and the UI never shows it. Put logloss last in `eval_metric` so early stopping gives usable probabilities; AUC alone stopped at 4 trees on synthetic data. Category values are whitespace-cleaned (`South of  USA`) so inference cannot silently miss a column. Script also trains with and without `Benefit per order` and logs both validation AUCs.
-Open: Not yet run on the real data, so no metrics are recorded. After the run: fill the Results table, decide `Benefit per order` (API never sends it) and the threshold, pin versions in `requirements.txt`, update the repo map (`train.csv`, `test.csv`) and Known Limitations, and give the UI owner the contract. API must map city to the exact `Market` strings.
+1. Data and EDA
+2. Model
+3. Weather penalty (rules)
+4. Weather forecast fetch
+5. API
+6. Dashboard
+7. Geocoding and region
+8. Evaluation and limitations
+9. Testing
+10. Repo, branches and docs
+11. Project decisions
+12. Open items
 
 ---
+
+## 1. Data and EDA
+
+**Status:** done.
+
+**What:** `EDA.py` inspects the separate train and test files and writes `eda_output.txt`. Findings: 144,415 train and 36,104 test rows, late share 0.5483 in both, no unseen categories, 23,645 `Order Id` values in both files, `Market` late rate almost flat (0.543 to 0.554).
+
+**Why:** Every later step depends on facts only the data shows: column names, leakage columns, target balance, categories, and whether train and test overlap. EDA verifies our assumptions and discovers what we must decide.
+
+**Alternatives considered:**
+
+- Skip EDA and train directly: rejected, because leakage or overlap would only show up after training, and a leaked model scores brilliantly then fails in real use.
+- Auto-drop suspicious columns: rejected. Leakage candidates are listed for manual review instead, so nothing is dropped silently.
+
+**Log:**
+
+- 2026-11-21: Added `EDA.py` and `eda_output.txt`. Files read with `latin-1`.
+
+**Open:** none.
+
+---
+
+## 2. Model
+
+**Status:** done (XGBoost, trained and saved).
+
+**What:** `feature_data.py` (11 features, leakage guard, one-hot encoding, defaults) and `model_training.py` (grouped split, logistic and random forest baselines, XGBoost with early stopping). Saves `final_xgb_model.pkl`, `processed_data_pipeline.pkl`, `defaults.json` and `metrics.json`.
+
+**Why XGBoost:**
+
+- The PS specifies an XGBoost classifier.
+- The data is a table of mixed numeric and categorical columns, where boosted trees usually perform best.
+- It outputs probabilities, which the dashboard needs for risk percentages and status badges.
+- It captures interactions (shipping mode with scheduled days) without hand-written rules.
+- It is fast and saves to a single file.
+
+**Alternatives considered:**
+
+- Logistic regression: simple and explainable. Trained as a baseline; ROC-AUC 0.7425.
+- Random forest: strong and easy. Trained as a baseline; ROC-AUC 0.7412.
+- LightGBM and CatBoost: very similar to XGBoost, a near coin flip. Not used because the PS names XGBoost.
+- Neural networks: overkill for a few tabular columns, and they need more data and tuning.
+- SVM and KNN: slow on this size and give weak probabilities.
+- Honest note: XGBoost (0.7426) does not beat the simple baselines. Its value here is the PS choice and probability output, not extra accuracy.
+
+**Feature and split decisions:**
+
+- Leakage excluded: `Days for shipping (real)`, `Delivery Status` and anything known only after dispatch. A guard in `feature_data.py` enforces this.
+- Pooled train and test, then re-split by `Order Id` (test 1/5, validation 1/6 of the rest). Using the files as given was rejected: 23,645 order ids were in both, which would inflate the test score. A plain random row split was rejected for the same reason.
+- `Market` used instead of `Order Region`: the backend can derive it from a geocoded city (5 values) and the UI never shows it.
+- `Benefit per order` dropped: validation AUC 0.73928 with it, 0.73927 without, and the API never sends it.
+- `model_training.py` also trains with and without `Benefit per order` and logs both validation AUCs.
+- Early stopping with logloss last in `eval_metric`, so the saved probabilities are usable (AUC alone stopped at 4 trees on synthetic data).
+- Category values whitespace-cleaned (`South of  USA`) so inference cannot silently miss a column.
+
+**Log:**
+
+- 2026-11-21: Added `feature_data.py`, `model_training.py` and the model files. Test results (threshold 0.5): ROC-AUC 0.7426, accuracy 0.6940, F1 0.6578, precision 0.8500, recall 0.5365.
+
+**Open:** record train AUC; update the repo map (`train.csv`, `test.csv`) and Known Limitations in the docs; choose the dashboard threshold (recall is only 0.5365 at 0.5); pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
+
+---
+
+## 3. Weather penalty (rules)
+
+**Status:** done (rules and tests); not yet wired into the API or dashboard.
+
+**What:** `weather_penalty.py` turns arrival-day weather into a penalty in percentage points, added on top of the model's base risk. Rain bands (2.5, 15.6, 64.5, 115.6, 204.5 mm) give 2, 5, 10, 15, 20 points, optionally scaled by rain probability. Wind bands (39, 62, 89 km/h) give 3, 6, 10. Heat bands (40, 45 C) give 2, 4. The total is capped at 25. It returns rain, wind, heat and total.
+
+**Why rule-based:**
+
+- The DataCo dataset has no weather, so the model cannot learn it.
+- We have no Indian delivery outcomes to fit or check a learned effect.
+- The PS says the weather penalty is a rule applied on top of the model output.
+- A rule is transparent: operators see the cause (rain +X, wind +Y), which supports the root-cause attribution feature.
+
+**Alternatives considered:**
+
+- Hand-picked thresholds: fastest, but arbitrary.
+- Standard category bands (chosen for the band edges): rain edges follow the IMD daily rainfall categories and wind edges follow the Beaufort scale (from memory, to be checked against the published tables). This only makes the edges defensible; the point values are still our judgment and have no measured accuracy.
+- Learn from data by joining historical weather to DataCo orders: rejected for now. The orders are US-heavy, the effect would not transfer to India, and the model already leans on shipping mode and scheduled days, so little signal is expected. Test later by comparing validation AUC with and without weather features.
+- Calibrate from logged outcomes: the only route to a measured penalty. Future work; needs real Indian deliveries.
+- Design choices: probability weighting reduces false alarms; the cap stops weather swamping the base risk; all constants sit in one block for easy review.
+
+**Log:**
+
+- 2026-11-23: Added `weather_penalty.py` and 22 tests. Chennai's earlier hardcoded +12.5 becomes +8.0 for the same inputs (24.5 mm, 42 km/h).
+
+**Open:** team reviews the point values; if a model is ever trained on weather, remove the rule penalty to avoid counting it twice; log weather inputs with predictions so the points can be calibrated.
+
+---
+
+## 4. Weather forecast fetch
+
+**Status:** done and verified live; not yet wired in.
+
+**What:** `weather_utils.py`: `get_arrival_weather(latitude, longitude, transit_days)` requests the Open-Meteo forecast for today plus transit days (rain total, rain probability, max wind, max temperature). Returns the values, a condition label (HEAVY RAIN, MODERATE RAIN, LIGHT RAIN, STRONG WIND, CLEAR, UNAVAILABLE), the penalty breakdown and an `available` flag.
+
+**Why:**
+
+- The PS requires weather for the arrival date, not current conditions.
+- Open-Meteo is the PS choice and needs no API key.
+- Transit days are limited to 1 to 16, the forecast range.
+
+**Alternatives considered:**
+
+- Current weather at dispatch: rejected, it is not what happens on the arrival day.
+- On failure, fall back to the old hardcoded table: rejected, it would show made-up numbers as if they were a forecast.
+- On failure, raise an error: rejected, it would break the whole prediction.
+- Chosen: zero penalty with `available: False` and `UNAVAILABLE`, so the UI can say "weather unavailable".
+- Successes are cached for 30 minutes so Streamlit reruns do not spam the API; failures are not cached, so they retry.
+
+**Log:**
+
+- 2026-11-23: Added `weather_utils.py` with mocked tests. Live call and tests confirmed working locally.
+
+**Open:** wire into the API and dashboard, replacing the hardcoded `INDIAN_HUBS` weather; the arrival date uses the server clock.
+
+---
+
+## 5. API
+
+**Status:** done and connected to the dashboard; weather not yet computed in the API.
+
+**What:** `FastAPI.py` serves `POST /predict` and `GET /health`. The request takes `order_quantity` (1 or more), `sales_per_customer` (0 or more), `product_price` (0 or more), `shipping_mode`, `scheduled_shipping_days` (1 or more, so zero-day transit is rejected with HTTP 422), optional `market` (defaults to Pacific Asia) and `weather_delay_penalty_pct` (0 to 100, default 0). `inference.py` loads the artifacts, scores the order, adds the penalty to the base risk and maps the total to a status (65 and 35 thresholds).
+
+**Why:**
+
+- The PS asks for a decoupled backend with strict Pydantic schemas, so other clients can reuse the model.
+- Validation lives in the API as well as the UI, as the PS requires.
+
+**Alternatives considered:**
+
+- Call the model directly from Streamlit: simpler to host, but breaks the decoupled design the PS emphasises.
+- Other frameworks (for example Flask): not needed; FastAPI gives schemas and `/docs` for free.
+- CORS: not needed, because Streamlit calls the API from Python, not from a browser. Add it only if a browser frontend ever calls the API directly.
+
+**Log:**
+
+- 2026-11-21: API and `inference.py` in the repo (logged retroactively). The dashboard posts to it at `CARGOSENSE_API` (default `http://127.0.0.1:8000`, 8 second timeout) and falls back to the static hub table if it is unreachable, tagging results `model` or `fallback`.
+
+**Open:** the penalty is currently supplied by the client; have the API compute it through `weather_utils.py` (a contract change to log). The request has no `destination_city` or `origin_hub`, unlike the PS example. `inference.py` has an inline comment that breaks the header-only rule.
+
+---
+
+## 6. Dashboard
+
+**Status:** in progress.
+
+**What:** Streamlit `app.py` with two pages: Pre-Dispatch Risk Simulator and Network Corridor Intelligence. Single-order input in the sidebar with validation; results come from the API; 3D arc map; status badges (STABLE OPTIMAL ROUTE, MODERATE CAUTION ZONE, CRITICAL SLA RISK).
+
+**Why:**
+
+- The PS describes a Streamlit dashboard with a calculator page and a route map page.
+- One shipment in, one prediction out matches the PS. The earlier CSV batch flow was removed.
+- Operators need speed and clarity, so metrics are consolidated into one "Shipment risk summary" card (total, base, weather penalty, distance, status, conditions, precipitation, wind, temperature, arrival date, advisory) with the map full width below.
+
+**Alternatives considered:**
+
+- React frontend: considered, then dropped. It means rebuilding two pages and the 3D map, which costs time better spent on missing PS features, and Streamlit already meets the PS. Streamlit's slowness and styling are fixable.
+- Deploying the frontend alone: rejected. Without the API it would show fallback numbers that look real but are not from the model.
+- Batch CSV or Excel upload and "shorter route" suggestions: out of scope for now. The model never sees distance, so a shorter route would not change the risk, and real routing needs road data.
+
+**Removed from the UI:** placeholder KPIs, "LIVE RADAR" label, duplicate weather labels, speed requirement, market and region chips, sidebar Facts panel, the non-functional "Authorize Dispatch Exception" button, emojis.
+
+**Log:**
+
+- 2026-11-23: Prepared an updated `app.py`: consolidated summary card, title no longer hidden under the header (top padding 2.2rem to 4.5rem), emojis and clutter removed, solid accent on the Run button ("Run risk assessment"). Not yet confirmed applied to the repo.
+- 2026-11-21: Replaced CSV input with the single-order flow (`validate_inputs`, `get_prediction`, session-state results), added `status_from_risk` and `get_arrival_weather`, removed fake metrics. Results are tied to the exact payload, so an input change needs a re-run. The Run button sits above the sidebar panels.
+
+**Open:** confirm the update was applied against the latest local `app.py`; restyle page 2; remove its placeholder numbers and add the real metrics card from `models/metrics.json`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`, cache or localise the state borders).
+
+---
+
+## 7. Geocoding and region
+
+**Status:** not built.
+
+**What (planned):** Geopy geocodes the destination, computes geodesic distance from the Delhi hub, and maps the city to a market region.
+
+**Why:** the PS lists geospatial mapping as a key feature. Today only 5 hub cities work, with hardcoded coordinates and distances.
+
+**Alternatives considered:**
+
+- Keep the 5 fixed hubs: fine for a first demo, but typing another city will not work.
+- Drop `Market` from the model: possible, since its late rate is almost flat (0.543 to 0.554) and the backend always uses Pacific Asia. Decide before building the mapping.
+- Multiple origin hubs: out of scope; Delhi is the single origin for now.
+
+**Open:** build `geo_utils.py`; decide whether to keep `Market` (if kept, the API must map each city to the exact `Market` strings from training); Nominatim needs a user-agent and has rate limits.
+
+---
+
+## 8. Evaluation and limitations
+
+**Status:** numbers recorded; PS figures replaced.
+
+**What:** Test results (XGBoost, threshold 0.5): ROC-AUC 0.7426, accuracy 0.6940, F1 0.6578, precision 0.8500, recall 0.5365. The PS reported 0.91 ROC-AUC and 89.4% accuracy; these are not our results and must not appear in the docs.
+
+**Overfitting check:** validation AUC 0.7393 against test 0.7426, early stopping at iteration 53 of 300, test calibration close, and simple models match XGBoost. So the limit is the features, not overfitting. Train AUC was not recorded.
+
+**Limitations to state openly:**
+
+- Trained on DataCo (US-heavy) and not validated on Indian routes. We do not add synthetic Indian data, since invented outcomes would make the model look India-ready when it is not.
+- First Class shows about 0.998 late in this dataset, which is a dataset quirk.
+- The weather penalty is rule-based with no measured accuracy.
+- Geodesic distance underestimates road distance.
+- All money is in USD, with no conversion.
+
+**Log:**
+
+- 2026-11-23: Overfitting check and India-data decision recorded.
+
+**Open:** record train AUC and optionally 5-fold grouped cross-validation; calibration of risk percentages; log predictions with weather inputs to validate on real outcomes later.
+
+---
+
+## 9. Testing
+
+**Status:** weather modules covered; model and API not yet.
+
+**What:** 32 passing tests in `tests/`: 22 for `weather_penalty.py` (band boundaries, probability scaling, cap, monotonic growth, validation) and 10 for `weather_utils.py` (parsing, wrong date, failure, caching, invalid days) using fake responses, so no network is needed. Run from the repo root: `python -m unittest discover -s tests -t . -v`.
+
+**Why:** the weather work cannot be checked against real outcomes, so the tests lock in the rules and the failure behaviour.
+
+**Alternatives considered:** pytest was not used, to avoid a new dependency; `unittest` is in the standard library.
+
+**Log:**
+
+- 2026-11-23: Tests moved into `tests/` with `tests/__init__.py`. App modules stay in the repo root.
+
+**Open:** add tests for `inference.py` and the API.
+
+---
+
+## 10. Repo, branches and docs
+
+**Status:** in place.
+
+**What:** `main` is the base branch; each teammate works on a feature branch (`feature/model-api`, `feature/ui`) and merges through pull requests. Commits follow Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`), one concern per commit. Docs: team doc, AGENTS.md (comment and naming rules), README, training plan, this log.
+
+**Why:** separate branches and separate files keep merge conflicts rare. Header-only comments and fixed naming conventions keep the code consistent across people and AI agents.
+
+**Log:**
+
+- 2026-11-21: Set `main` as the base; a commit pushed to the wrong branch was moved to `feature/model-api`. Added the README and this log.
+
+**Open:** set `main` as the GitHub default branch; README must sit in the repo root (it is in `docs/`); replace 0.91 and 89.4% with the real numbers and fill F1 and the split; change the clone URL from SmartFreight to CargoSense; add the team doc, AGENTS.md and `docs/MODEL_TRAINING_PLAN.md` to the repo; update docs for `tests/`, the weather modules and the new API contract; pin `requirements.txt`; consider moving the project out of OneDrive.
+
+---
+
+## 11. Project decisions
+
+- Stay on Streamlit.
+- Live demo from a local run, with a recorded backup. No hosting.
+- All money in USD end to end.
+- Delhi is the single origin hub.
+- Market and order region are backend-only and never shown in the UI.
+- Out of scope for now: batch upload, route optimisation, "what-if" suggestions, multiple hubs, deployment.
+
+---
+
+## 12. Open items
+
+1. Wire the weather into the API and dashboard (contract change).
+2. Build Geopy geocoding and decide on `Market`.
+3. Confirm the 65 and 35 status thresholds and choose the dashboard threshold.
+4. Restyle page 2 and add the real metrics card.
+5. Record train AUC; update all docs with the real metrics.
+6. Fix the speed and the theme toggle.
+7. Repo cleanup: root README, rename SmartFreight, pin requirements, `.gitignore`.
+8. Rehearse the demo and record a backup video.
