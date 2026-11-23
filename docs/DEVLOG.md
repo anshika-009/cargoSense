@@ -120,7 +120,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 ## 4. Weather forecast fetch
 
-**Status:** done and verified live; not yet wired in.
+**Status:** single-point arrival forecast done; route-based weather added in `route_weather.py` and used by the API.
 
 **What:** `weather_utils.py`: `get_arrival_weather(latitude, longitude, transit_days)` requests the Open-Meteo forecast for today plus transit days (rain total, rain probability, max wind, max temperature). Returns the values, a condition label (HEAVY RAIN, MODERATE RAIN, LIGHT RAIN, STRONG WIND, CLEAR, UNAVAILABLE), the penalty breakdown and an `available` flag.
 
@@ -140,6 +140,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-23: Added `route_weather.py` (13 mocked tests): up to 3 OSRM routes, a point about every 150 km, each point dated by spreading the route evenly over the scheduled transit days from the dispatch date, one Open-Meteo request per route, each point-day scored by `compute_weather_penalty()`, then averaged per point, per route and across routes. Penalties are averaged, not raw rain or wind, and the worst point is reported. OSRM failure falls back to a straight line (`weather_source: geodesic`); a forecast failure gives penalty 0 and `weather_available: false`. Not yet run against the live services.
 - 2026-11-23: Added `weather_utils.py` with mocked tests. Live call and tests confirmed working locally.
 
 **Open:** wire into the API and dashboard, replacing the hardcoded `INDIAN_HUBS` weather; the arrival date uses the server clock.
@@ -148,7 +149,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 ## 5. API
 
-**Status:** done and connected to the dashboard; weather not yet computed in the API.
+**Status:** done; the API computes the weather penalty itself.
 
 **What:** `FastAPI.py` serves `POST /predict` and `GET /health`. The request takes `order_quantity` (1 or more), `sales_per_customer` (0 or more), `product_price` (0 or more), `shipping_mode`, `scheduled_shipping_days` (1 or more, so zero-day transit is rejected with HTTP 422), optional `market` (defaults to Pacific Asia) and `weather_delay_penalty_pct` (0 to 100, default 0). `inference.py` loads the artifacts, scores the order, adds the penalty to the base risk and maps the total to a status (65 and 35 thresholds).
 
@@ -165,9 +166,10 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-23: CONTRACT CHANGE (v2.0). The API now computes the weather penalty. The request field `weather_delay_penalty_pct` is no longer used (a client that still sends it is ignored) and `market` is derived from the geocoded country. Added optional request fields `destination_state`, `destination_lat`, `destination_lon` (sent together; if missing the city is geocoded) and `dispatch_date` (default today; past dates and arrivals beyond 15 days are rejected), and `scheduled_shipping_days` now has an upper limit of 15. Added response fields `weather_rain_pct`, `weather_wind_pct`, `weather_heat_pct`, `weather_worst_penalty_pct`, `weather_available`, `weather_reason`, `weather_source`, `weather_dispatch_date`, `weather_arrival_date`, `weather` (averages and worst point), `distance_km` and `market`. Existing response fields keep their names and units, so the current dashboard keeps working.
 - 2026-11-21: API and `inference.py` in the repo (logged retroactively). The dashboard posts to it at `CARGOSENSE_API` (default `http://127.0.0.1:8000`, 8 second timeout) and falls back to the static hub table if it is unreachable, tagging results `model` or `fallback`.
 
-**Open:** the penalty is currently supplied by the client; have the API compute it through `weather_utils.py` (a contract change to log). The request has no `destination_city` or `origin_hub`, unlike the PS example. `inference.py` has an inline comment that breaks the header-only rule.
+**Open:** `inference.py` has an inline comment that breaks the header-only rule; log weather inputs with predictions so the points can be calibrated.
 
 ---
 
@@ -202,7 +204,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 ## 7. Geocoding and region
 
-**Status:** not built.
+**Status:** backend built in `geo_utils.py`; the dashboard still uses its fixed 28-state list.
 
 **What (planned):** Geopy geocodes the destination, computes geodesic distance from the Delhi hub, and maps the city to a market region.
 
@@ -214,7 +216,11 @@ A record of what we built, why, and what we rejected, organised by feature. With
 - Drop `Market` from the model: possible, since its late rate is almost flat (0.543 to 0.554) and the backend always uses Pacific Asia. Decide before building the mapping.
 - Multiple origin hubs: out of scope; Delhi is the single origin for now.
 
-**Open:** build `geo_utils.py`; decide whether to keep `Market` (if kept, the API must map each city to the exact `Market` strings from training); Nominatim needs a user-agent and has rate limits.
+**Log:**
+
+- 2026-11-23: Added `geo_utils.py` (5 tests): Nominatim geocoding restricted to India with in-memory caching, geodesic distance from Delhi, and a country to `Market` map. Decision: keep `Market` as a backend-only feature because the model was trained with it; every Indian destination maps to Pacific Asia. A failed lookup is an HTTP 422, not a guess.
+
+**Open:** a live Nominatim check; Nominatim has rate limits.
 
 ---
 
