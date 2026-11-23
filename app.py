@@ -75,6 +75,12 @@ CRITICAL_WARN_PIN_URI = svg_to_data_uri(
     "</svg>"
 )
 
+# Apply pending one-click mitigation updates before widget instantiation
+if "pending_mode_update" in st.session_state:
+    st.session_state["shipping_mode_input"] = st.session_state.pop("pending_mode_update")
+if "pending_days_update" in st.session_state:
+    st.session_state["committed_days_input"] = st.session_state.pop("pending_days_update")
+
 top_col1, top_col2 = st.columns([4, 1.3])
 
 with top_col1:
@@ -215,7 +221,6 @@ header[data-testid="stHeader"] {{
     background-color: transparent !important;
 }}
 
-/* Ensure any light/white-background container or popover has crisp black/dark text */
 div[data-baseweb="popover"],
 div[data-baseweb="popover"] *,
 div[data-baseweb="menu"],
@@ -349,16 +354,29 @@ div[data-baseweb="menu"] li {{
 }}
 
 div[data-testid="stNumberInput"] div[data-baseweb="input"],
-div[data-testid="stNumberInput"] input {{
+div[data-testid="stNumberInput"] input,
+div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {{
     background-color: {bg_input} !important;
     color: {text_input} !important;
     border-color: {border_input} !important;
 }}
 
-div[data-testid="stNumberInput"] button,
-div[data-testid="stNumberInput"] button svg {{
-    color: {text_input} !important;
-    fill: {text_input} !important;
+div[data-testid="stNumberInput"] button {{
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: {border_input} !important;
+}}
+
+div[data-testid="stNumberInput"] button:hover {{
+    background-color: #f1f5f9 !important;
+}}
+
+div[data-testid="stNumberInput"] button svg,
+div[data-testid="stNumberInput"] button svg path {{
+    color: #000000 !important;
+    fill: #000000 !important;
+    stroke: #000000 !important;
+    opacity: 1 !important;
 }}
 
 div[data-testid="stDeckGlJsonChart"] {{
@@ -702,18 +720,57 @@ def get_prediction(payload, hub_record):
 
 
 def get_plus_one_day_what_if(payload, hub_record, current_total_pct):
-    """Run a simple +1 transit day comparison using the same prediction function."""
+    """Run a +1 transit day comparison, including a sensible fallback buffer adjustment."""
     if payload["scheduled_shipping_days"] >= 6:
         return None
     next_days = payload["scheduled_shipping_days"] + 1
     next_payload = dict(payload, scheduled_shipping_days=next_days)
     next_pred = get_prediction(next_payload, hub_record)
     next_total_pct = round(next_pred["late_delivery_risk_prob"] * 100.0, 1)
+
+    if next_pred.get("source") == "fallback":
+        relief = 0.0
+        if hub_record.get("weather_penalty", 0.0) >= 7.5 or hub_record.get("dist", 0) >= 1500:
+            relief = -3.5
+        elif payload["scheduled_shipping_days"] <= 2:
+            relief = -2.0
+        next_total_pct = min(max(round(current_total_pct + relief, 1), 0.0), 100.0)
+
     diff_pct = round(next_total_pct - current_total_pct, 1)
     return {
         "next_days": next_days,
         "next_total_pct": next_total_pct,
         "diff_pct": diff_pct,
+    }
+
+
+def run_and_store_assessment(hub_rec, qty, sales, price, mode, days):
+    current_payload = {
+        "order_quantity": int(qty),
+        "sales_per_customer": float(sales),
+        "product_price": float(price),
+        "shipping_mode": mode,
+        "scheduled_shipping_days": int(days),
+        "destination_city": hub_rec["city"],
+        "origin_hub": ORIGIN_HUB,
+    }
+    input_errors = validate_inputs(
+        current_payload["order_quantity"],
+        current_payload["scheduled_shipping_days"],
+        current_payload["sales_per_customer"],
+        current_payload["product_price"],
+    )
+    if input_errors:
+        for err_msg in input_errors:
+            st.error(err_msg)
+        return
+    pred_result = get_prediction(current_payload, hub_rec)
+    total_pct_val = round(pred_result["late_delivery_risk_prob"] * 100.0, 1)
+    what_if_result = get_plus_one_day_what_if(current_payload, hub_rec, total_pct_val)
+    st.session_state["prediction"] = {
+        "payload": current_payload,
+        "result": pred_result,
+        "what_if": what_if_result,
     }
 
 
@@ -829,10 +886,17 @@ with c_mode:
     shipping_mode = st.selectbox(
         "Shipping Mode",
         ["Standard Class", "First Class", "Second Class", "Same Day"],
+        key="shipping_mode_input",
     )
 
 with c_days:
-    committed_days = st.slider("Transit Window (Days)", 1, 6, 3)
+    committed_days = st.slider(
+        "Transit Window (Days)",
+        1,
+        6,
+        3,
+        key="committed_days_input",
+    )
 
 c_qty, c_sales, c_price, c_arcs, c_view, c_run = st.columns([1.0, 1.2, 1.2, 1.2, 1.5, 1.4])
 with c_qty:
@@ -855,7 +919,6 @@ with c_run:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Hide sidebar toggle on Page 1; only show it on Page 2 (Network Corridor Intelligence)
 if nav_choice != "Network Corridor Intelligence":
     st.markdown(
         """
@@ -879,33 +942,14 @@ if run_clicked:
     if not selected_state or not selected_city or not active_hub:
         st.warning("Please choose both a Destination State and Destination City first.")
     else:
-        current_payload = {
-            "order_quantity": int(order_quantity),
-            "sales_per_customer": float(sales_per_customer),
-            "product_price": float(product_price),
-            "shipping_mode": shipping_mode,
-            "scheduled_shipping_days": int(committed_days),
-            "destination_city": active_hub["city"],
-            "origin_hub": ORIGIN_HUB,
-        }
-        input_errors = validate_inputs(
-            current_payload["order_quantity"],
-            current_payload["scheduled_shipping_days"],
-            current_payload["sales_per_customer"],
-            current_payload["product_price"],
+        run_and_store_assessment(
+            active_hub,
+            order_quantity,
+            sales_per_customer,
+            product_price,
+            shipping_mode,
+            committed_days,
         )
-        if input_errors:
-            for err_msg in input_errors:
-                st.error(err_msg)
-        else:
-            pred_result = get_prediction(current_payload, active_hub)
-            total_pct_val = round(pred_result["late_delivery_risk_prob"] * 100.0, 1)
-            what_if_result = get_plus_one_day_what_if(current_payload, active_hub, total_pct_val)
-            st.session_state["prediction"] = {
-                "payload": current_payload,
-                "result": pred_result,
-                "what_if": what_if_result,
-            }
 
 expected_payload = (
     {
@@ -941,7 +985,6 @@ what_if_data = (
     else None
 )
 
-# --- SIDEBAR: OPTIONAL MODEL VALIDATION & FEATURE WEIGHTS ---
 with st.sidebar:
     st.markdown("### Model Validation & Weights")
     show_model_sidebar = st.checkbox("Show ROC / Validation Metrics", value=False)
@@ -1449,6 +1492,36 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
         """,
         unsafe_allow_html=True,
     )
+
+    # One-click dispatch remedy action after scoring
+    if current_pred and active_status != STATUS_STABLE:
+        st.write("")
+        if current_mode != "First Class":
+            if st.button("⚡ Apply First Class Upgrade & Re-Score", use_container_width=True):
+                st.session_state["pending_mode_update"] = "First Class"
+                run_and_store_assessment(
+                    active_hub_rec,
+                    order_quantity,
+                    sales_per_customer,
+                    product_price,
+                    "First Class",
+                    current_days,
+                )
+                st.rerun()
+        elif current_days < 6:
+            if st.button("⏱️ Add +1 Transit Day & Re-Score", use_container_width=True):
+                next_d = current_days + 1
+                st.session_state["pending_days_update"] = next_d
+                run_and_store_assessment(
+                    active_hub_rec,
+                    order_quantity,
+                    sales_per_customer,
+                    product_price,
+                    current_mode,
+                    next_d,
+                )
+                st.rerun()
+
     return active_status
 
 
