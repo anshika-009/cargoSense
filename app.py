@@ -879,17 +879,6 @@ def get_static_weather(hub_record, days):
     }
 
 
-def get_static_weather(hub_record, days):
-    return {
-        "precip": hub_record["precip"],
-        "wind": hub_record["wind"],
-        "temp_c": hub_record["temp_c"],
-        "condition": hub_record["weather"],
-        "forecast_date": datetime.now() + timedelta(days=days),
-        "penalty_pct": hub_record["weather_penalty"],
-    }
-
-
 def build_payload(hub_rec, qty, sales, price, mode, days, dispatch):
     return {
         "order_quantity": int(qty),
