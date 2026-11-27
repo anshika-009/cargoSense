@@ -6,6 +6,7 @@ import base64
 import json
 import os
 from datetime import date, datetime, timedelta
+from datetime import time as dt_time
 from pathlib import Path
 
 import pandas as pd
@@ -868,18 +869,7 @@ def show(value, unit=""):
     return "n/a" if value is None else f"{value}{unit}"
 
 
-def get_static_weather(hub_record, days):
-    return {
-        "precip": hub_record["precip"],
-        "wind": hub_record["wind"],
-        "temp_c": hub_record["temp_c"],
-        "condition": hub_record["weather"],
-        "forecast_date": datetime.now() + timedelta(days=days),
-        "penalty_pct": hub_record["weather_penalty"],
-    }
-
-
-def build_payload(hub_rec, qty, sales, price, mode, days, dispatch):
+def build_payload(hub_rec, qty, sales, price, mode, days, dispatch, dispatch_hour):
     return {
         "order_quantity": int(qty),
         "sales_per_customer": float(sales),
@@ -892,6 +882,7 @@ def build_payload(hub_rec, qty, sales, price, mode, days, dispatch):
         "destination_lon": hub_rec["coords"][0],
         "origin_hub": ORIGIN_HUB,
         "dispatch_date": dispatch.isoformat(),
+        "dispatch_hour": int(dispatch_hour),
     }
 
 
@@ -932,8 +923,8 @@ def get_plus_one_day_what_if(payload, current_total_pct):
     }
 
 
-def run_and_store_assessment(hub_rec, qty, sales, price, mode, days, dispatch):
-    current_payload = build_payload(hub_rec, qty, sales, price, mode, days, dispatch)
+def run_and_store_assessment(hub_rec, qty, sales, price, mode, days, dispatch, dispatch_hour):
+    current_payload = build_payload(hub_rec, qty, sales, price, mode, days, dispatch, dispatch_hour)
     input_errors = validate_inputs(
         current_payload["order_quantity"],
         current_payload["scheduled_shipping_days"],
@@ -1082,7 +1073,7 @@ with c_days:
         key="committed_days_input",
     )
 
-c_qty, c_sales, c_price, c_date, c_arcs, c_view, c_run = st.columns([0.9, 1.1, 1.1, 1.3, 1.2, 1.5, 1.4])
+c_qty, c_sales, c_price, c_date, c_time, c_arcs, c_view, c_run = st.columns([0.8, 1.0, 1.0, 1.2, 0.9, 1.1, 1.4, 1.3])
 with c_qty:
     order_quantity = st.number_input("Quantity", min_value=1, value=1, step=1)
 with c_sales:
@@ -1096,6 +1087,9 @@ with c_date:
         min_value=date.today(),
         max_value=date.today() + timedelta(days=FORECAST_HORIZON_DAYS - 1),
     )
+with c_time:
+    dispatch_time = st.time_input("Dispatch Time", value=dt_time(datetime.now().hour, 0), step=timedelta(hours=1))
+    dispatch_hour = dispatch_time.hour
 with c_arcs:
     st.write("")
     show_secondary = st.checkbox("All Corridor Arcs", value=False)
@@ -1168,12 +1162,13 @@ if run_clicked:
             shipping_mode,
             committed_days,
             dispatch_date,
+            dispatch_hour,
         )
 
 expected_payload = (
     build_payload(
         active_hub, order_quantity, sales_per_customer, product_price,
-        shipping_mode, committed_days, dispatch_date,
+        shipping_mode, committed_days, dispatch_date, dispatch_hour,
     )
     if active_hub
     else None
@@ -1471,139 +1466,149 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
 
 def render_corridor_intelligence(committed_days, hub_rec=None, scored_pred=None, qty=1, sales=50.0):
     st.markdown(
-        '<div class="page2-sidebar-trigger">☰ Use the top-left sidebar toggle to view Model Validation &amp; Weights</div>',
+        '<div class="page2-sidebar-trigger">Use the top-left sidebar toggle to view Model Validation &amp; Weights</div>',
         unsafe_allow_html=True,
     )
 
-    all_corridor_stats = []
-    for rec in get_all_city_records():
-        city_weather = get_static_weather(rec, committed_days)
-        city_total_pct = min(round(rec["base_risk"] + city_weather["penalty_pct"], 1), 100.0)
-        all_corridor_stats.append(
-            {
-                "state": rec["state"],
-                "city": rec["city"],
-                "dist": rec["dist"],
-                "weather": city_weather,
-                "total_pct": city_total_pct,
-                "status": status_from_risk(city_total_pct),
-            }
+    records = get_all_city_records()
+    for rec in records:
+        rec["terrain"] = get_terrain_profile(rec["state"], rec["dist"])
+
+    metrics = load_model_metrics()
+    st.markdown('<div class="card-title">Model performance (held-out test set, threshold 0.5)</div>', unsafe_allow_html=True)
+    if metrics:
+        test_rows = metrics.get("rows", {}).get("test")
+        sub_text = f"{test_rows:,} test rows" if test_rows else "test set"
+        previous = metrics.get("baseline_without_order_hour", {})
+
+        def was(key, as_percent):
+            if key not in previous:
+                return sub_text
+            return f"was {previous[key] * 100:.1f}% before" if as_percent else f"was {previous[key]:.3f} before"
+
+        m1, m2, m3, m4, m5 = st.columns(5)
+        for column, label, value, note in [
+            (m1, "ROC-AUC", f'{metrics.get("roc_auc", 0.0):.3f}', was("roc_auc", False)),
+            (m2, "Accuracy", f'{metrics.get("accuracy", 0.0) * 100:.1f}%', was("accuracy", True)),
+            (m3, "Precision", f'{metrics.get("precision", 0.0) * 100:.1f}%', was("precision", True)),
+            (m4, "Recall", f'{metrics.get("recall", 0.0) * 100:.1f}%', was("recall", True)),
+            (m5, "F1 Score", f'{metrics.get("f1", 0.0):.3f}', was("f1", False)),
+        ]:
+            with column:
+                st.markdown(metric_tile(label, value, note, accent), unsafe_allow_html=True)
+        st.caption(
+            f"{sub_text}. Trained on the DataCo dataset (US-heavy) and not validated on Indian routes. "
+            "The weather penalty is rule-based and is not part of these metrics."
         )
+        by_mode = metrics.get("by_shipping_mode", {})
+        if by_mode:
+            mode_rows = ""
+            for mode_name, row in by_mode.items():
+                gained = row["accuracy"] - row["accuracy_without_order_hour"]
+                change = f"+{gained * 100:.1f} pts" if gained > 0.0005 else "no change"
+                mode_rows += (
+                    f"<tr><td><strong>{mode_name}</strong></td><td>{row['rows']:,}</td>"
+                    f"<td>{row['late_rate'] * 100:.1f}%</td>"
+                    f"<td>{row['accuracy_without_order_hour'] * 100:.1f}%</td>"
+                    f"<td><strong>{row['accuracy'] * 100:.1f}%</strong></td><td>{change}</td></tr>"
+                )
+            ceiling = metrics.get("accuracy_ceiling")
+            ceiling_text = f" The best accuracy this data allows is about {ceiling * 100:.1f}%." if ceiling else ""
+            st.markdown(
+                f'<div class="intel-card"><div class="card-title">Accuracy by shipping mode (before and after the order-hour feature)</div>'
+                f'<table class="intel-table"><thead><tr><th>Mode</th><th>Test rows</th><th>Late rate</th>'
+                f"<th>Accuracy before</th><th>Accuracy now</th><th>Change</th></tr></thead>"
+                f"<tbody>{mode_rows}</tbody></table>"
+                f'<div style="font-size:12.5px; margin-top:8px;">The whole gain comes from Same Day orders, where orders placed before noon are '
+                f"never late and later ones almost always are. The other modes were already at the best accuracy their data allows.{ceiling_text}</div></div>",
+                unsafe_allow_html=True,
+            )
+    else:
+        st.caption("Model metrics are unavailable: models/metrics.json was not found.")
 
-    flagged_cities = [
-        f"{row['city']} ({row['state']})"
-        for row in all_corridor_stats
-        if row["status"] == STATUS_CRITICAL
-    ]
-    avg_total_pct = sum(r["total_pct"] for r in all_corridor_stats) / max(len(all_corridor_stats), 1)
-    avg_status = status_from_risk(avg_total_pct)
-
+    distances = [r["dist"] for r in records]
     k1, k2, k3 = st.columns(3)
     with k1:
-        st.markdown(
-            metric_tile("Tracked Hubs", str(len(all_corridor_stats)), "Across all 28 Indian states", accent),
-            unsafe_allow_html=True,
-        )
+        st.markdown(metric_tile("Tracked Hubs", str(len(records)), f"Destination cities across {len({r['state'] for r in records})} states", accent), unsafe_allow_html=True)
     with k2:
-        st.markdown(
-            metric_tile(
-                "Critical Bottlenecks",
-                f'<span style="color: {STATUS_COLORS[STATUS_CRITICAL]};">{len(flagged_cities)}</span>',
-                f"{len(flagged_cities)} high-risk hubs",
-                STATUS_FILL[STATUS_CRITICAL],
-            ),
-            unsafe_allow_html=True,
-        )
+        st.markdown(metric_tile("Nearest Hub", f"{min(distances):,.0f} km", "Geodesic distance from Delhi", accent), unsafe_allow_html=True)
     with k3:
-        st.markdown(
-            metric_tile(
-                "Avg Corridor Risk",
-                f'<span style="color: {STATUS_COLORS[avg_status]};">{avg_total_pct:.1f}%</span>',
-                "Base risk + weather penalty",
-                STATUS_FILL[avg_status],
-            ),
-            unsafe_allow_html=True,
-        )
+        st.markdown(metric_tile("Furthest Hub", f"{max(distances):,.0f} km", "Geodesic distance from Delhi", accent), unsafe_allow_html=True)
 
     if hub_rec and scored_pred:
         total_order_value = float(sales) * int(qty)
-        penalty_rate = 0.20
         risk_prob = float(scored_pred["late_delivery_risk_prob"])
-        est_exposure = total_order_value * risk_prob * penalty_rate
-        expedite_cost = 45.0
-        roi_pct = ((est_exposure - expedite_cost) / expedite_cost) * 100.0 if expedite_cost > 0 else 0.0
-
+        weather_line = (
+            f"+{scored_pred['weather_delay_penalty_pct']:.1f}% weather"
+            if scored_pred["weather_available"]
+            else "weather unavailable"
+        )
         st.markdown(
             f'<div class="intel-card">'
-            f'<div class="card-title">Executive SLA &amp; Cost Impact · {ORIGIN_HUB} → {hub_rec["city"]} ({hub_rec["state"]})</div>'
+            f'<div class="card-title">Scored Shipment · {ORIGIN_HUB} to {hub_rec["city"]} ({hub_rec["state"]})</div>'
             f'<div style="display:flex; flex-wrap:wrap; gap:28px; font-size:13.5px;">'
-            f'<div><strong>Order Value:</strong> ${total_order_value:,.2f}</div>'
-            f'<div><strong>SLA Penalty Exposure (20%):</strong> <span style="color:{crit_text}; font-weight:700;">${est_exposure:,.2f}</span> ({risk_prob * 100.0:.1f}% risk)</div>'
-            f'<div><strong>Expedite Cost vs ROI:</strong> ${expedite_cost:,.0f} ({roi_pct:+.0f}% ROI)</div>'
+            f'<div><strong>Order Value:</strong> ${total_order_value:,.2f} USD</div>'
+            f'<div><strong>Late Risk:</strong> {risk_prob * 100.0:.1f}% '
+            f'({scored_pred["base_risk_pct"]:.1f}% base, {weather_line})</div>'
+            f'<div><strong>Value at Risk:</strong> ${total_order_value * risk_prob:,.2f} USD '
+            f'(order value x late probability)</div>'
             f'</div></div>',
             unsafe_allow_html=True,
         )
+    else:
+        st.caption("Score a shipment on the Pre-Dispatch Risk Simulator to see its risk and value at risk here.")
 
     st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
+    terrain_types = sorted({r["terrain"]["type"] for r in records})
     f_col1, f_col2 = st.columns([3, 2])
     with f_col1:
-        hub_filter = st.radio(
-            "Filter Corridors",
-            ["All Hubs", "Critical Risk Only", "Severe Weather"],
-            horizontal=True,
-            label_visibility="collapsed",
-        )
+        terrain_filter = st.selectbox("Terrain", ["All terrains"] + terrain_types, label_visibility="collapsed")
     with f_col2:
         hub_sort = st.selectbox(
             "Sort Order",
-            ["Highest Risk %", "Furthest Distance", "State / City (A-Z)"],
+            ["Furthest Distance", "Highest Friction", "State / City (A-Z)"],
             label_visibility="collapsed",
         )
 
-    filtered_hubs = all_corridor_stats
-    if hub_filter == "Critical Risk Only":
-        filtered_hubs = [h for h in filtered_hubs if h["status"] == STATUS_CRITICAL]
-    elif hub_filter == "Severe Weather":
-        filtered_hubs = [
-            h for h in filtered_hubs
-            if (h["weather"]["precip"] >= 15.0 or h["weather"]["wind"] >= 25.0)
-        ]
-
-    if hub_sort == "Highest Risk %":
-        filtered_hubs = sorted(filtered_hubs, key=lambda x: x["total_pct"], reverse=True)
-    elif hub_sort == "Furthest Distance":
-        filtered_hubs = sorted(filtered_hubs, key=lambda x: x["dist"], reverse=True)
+    filtered = [r for r in records if terrain_filter == "All terrains" or r["terrain"]["type"] == terrain_filter]
+    if hub_sort == "Furthest Distance":
+        filtered = sorted(filtered, key=lambda r: r["dist"], reverse=True)
+    elif hub_sort == "Highest Friction":
+        filtered = sorted(filtered, key=lambda r: r["terrain"]["friction_mult"], reverse=True)
     else:
-        filtered_hubs = sorted(filtered_hubs, key=lambda x: (x["state"], x["city"]))
+        filtered = sorted(filtered, key=lambda r: (r["state"], r["city"]))
 
     rows_html = ""
-    for row in filtered_hubs[:25]:
-        tag = f'<span class="{STATUS_TAG_CLASS[row["status"]]}">{row["status"]}</span>'
-        risk_cell = (
-            f'<strong>{row["total_pct"]:.0f}%</strong>'
-            f'<span class="mini-bar"><div style="width: {min(row["total_pct"], 100)}%; background: {STATUS_FILL[row["status"]]};"></div></span>'
+    for rec in filtered:
+        scored_here = bool(
+            hub_rec and scored_pred and rec["state"] == hub_rec["state"] and rec["city"] == hub_rec["city"]
         )
-        cond_label = format_weather_condition(
-            row["weather"]["condition"], row["weather"]["precip"], row["weather"]["wind"]
-        )
+        if scored_here:
+            total_pct = round(scored_pred["late_delivery_risk_prob"] * 100.0, 1)
+            status = status_from_risk(total_pct)
+            risk_cell = f'<strong>{total_pct:.0f}%</strong> <span class="{STATUS_TAG_CLASS[status]}">{status}</span>'
+        else:
+            risk_cell = f"<span style='color:{text_sub};'>Not scored</span>"
         rows_html += (
             f"<tr>"
-            f"<td><strong>Delhi HQ → {row['city']}</strong> <span style='color:{text_sub};'>({row['state']})</span></td>"
-            f"<td>{row['dist']:,.0f} KM</td>"
-            f"<td>{cond_label}</td>"
+            f"<td><strong>Delhi HQ to {rec['city']}</strong> <span style='color:{text_sub};'>({rec['state']})</span></td>"
+            f"<td>{rec['dist']:,.0f} km</td>"
+            f"<td>{rec['terrain']['type']}</td>"
+            f"<td>{rec['terrain']['friction_mult']:.2f}x</td>"
             f"<td>{risk_cell}</td>"
-            f"<td>{tag}</td>"
             f"</tr>"
         )
-
     if not rows_html:
-        rows_html = f"<tr><td colspan='5' style='text-align:center; color:{text_sub}; padding:18px;'>No corridors match the selected filter.</td></tr>"
+        rows_html = (
+            f"<tr><td colspan='5' style='text-align:center; color:{text_sub}; padding:18px;'>"
+            f"No corridors match the selected filter.</td></tr>"
+        )
 
     st.markdown(
         f'<div class="intel-card">'
-        f'<div class="card-title">28-State Corridor Telemetry Snapshot (Showing {len(filtered_hubs[:25])} of {len(filtered_hubs)} Matching Hubs)</div>'
+        f'<div class="card-title">Corridor Reference ({len(filtered)} of {len(records)} hubs)</div>'
         f'<table class="intel-table">'
-        f"<thead><tr><th>Corridor</th><th>Distance</th><th>Condition</th><th>Risk</th><th>Status</th></tr></thead>"
+        f"<thead><tr><th>Corridor</th><th>Distance</th><th>Terrain</th><th>Indicative Friction</th><th>Scored Risk</th></tr></thead>"
         f"<tbody>{rows_html}</tbody>"
         f"</table></div>",
         unsafe_allow_html=True,
@@ -1817,6 +1822,7 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                     "First Class",
                     current_days,
                     dispatch_date,
+                    dispatch_hour,
                 )
                 st.rerun()
         elif current_days < 6:
@@ -1831,6 +1837,7 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
                     current_mode,
                     next_d,
                     dispatch_date,
+                    dispatch_hour,
                 )
                 st.rerun()
 
@@ -1843,6 +1850,7 @@ def render_shipment_summary_card(active_hub_rec, current_days, current_mode, cur
             "destination_state": active_hub_rec["state"],
             "distance_km": route_km,
             "dispatch_date": dispatch_date.isoformat(),
+            "dispatch_hour": dispatch_hour,
             "weather_available": weather_info["available"],
             "terrain_type": terrain_info["type"],
             "friction_multiplier": terrain_info["friction_mult"],

@@ -52,7 +52,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Status:** done (XGBoost, trained and saved).
 
-**What:** `feature_data.py` (11 features, leakage guard, one-hot encoding, defaults) and `model_training.py` (grouped split, logistic and random forest baselines, XGBoost with early stopping). Saves `final_xgb_model.pkl`, `processed_data_pipeline.pkl`, `defaults.json` and `metrics.json`.
+**What:** `feature_data.py` (11 features, leakage guard, one-hot encoding, defaults) and `model_training.py` (grouped split, logistic and random forest baselines, XGBoost with early stopping, train AUC, optional `--cv`, a second model without the order-hour feature for before and after, accuracy by shipping mode). Saves `final_xgb_model.pkl`, `processed_data_pipeline.pkl`, `defaults.json` and `metrics.json`. `experiments/improve_model.py` runs each accuracy experiment alone against the baseline and saves `models/experiments.json`.
 
 **Why XGBoost:**
 
@@ -85,7 +85,14 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 - 2026-11-21: Added `feature_data.py`, `model_training.py` and the model files. Test results (threshold 0.5): ROC-AUC 0.7426, accuracy 0.6940, F1 0.6578, precision 0.8500, recall 0.5365.
 
-**Open:** record train AUC; update the repo map (`train.csv`, `test.csv`) and Known Limitations in the docs; choose the dashboard threshold (recall is only 0.5365 at 0.5); pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
+- 2026-11-27: ACCURACY WORK. Added the same-day order hour feature (the hour of the order, used only for Same Day orders; -1 for other modes). Test ROC-AUC 0.7426 to 0.7718, accuracy 69.4% to 71.7%, F1 0.6578 to 0.6910, precision 0.8500 to 0.8607, recall 0.5365 to 0.5773. Train AUC 0.7813, validation 0.7705; 5-fold grouped CV ROC-AUC 0.7719 (std 0.0010), accuracy 71.9% (std 0.0022).
+- 2026-11-27: How we found it. Late rate by mode and scheduled days showed each mode has one scheduled day count, and real transit days inside First, Second and Standard Class are spread evenly (Standard Class 2 to 6 days), so nothing can predict them. Same Day orders placed before noon were never late (0.000) and from noon on were late 95.6% of the time, and the original features ignored the order time.
+- 2026-11-27: Where the gain is. All of it is Same Day orders (accuracy 53.3% to 98.3% on 1,845 test rows). First, Second and Standard Class were already equal to always guessing their majority outcome, and excluding Same Day the accuracy is 70.3% before and after. The best accuracy this dataset allows is about 71.9% and CV accuracy reaches it, so more features will not raise it.
+- 2026-11-27: Experiments (test ROC-AUC / accuracy): baseline 0.7426 / 69.4%; raw order hour 0.7692 / 71.7%; raw hour, month, weekday 0.7674 / 71.7%; same-day hour 0.7718 / 71.7% (adopted); drop cancelled and fraud orders from training 0.7587 / 71.7%; product category 0.7714 / 71.7%; order region 0.7718 / 71.7%; deeper trees 0.7720 / 71.7%. Raw hour was rejected: with it, a Standard Class order's base risk changed with the hour (34% at 09:00 vs 40% at 15:00) although the data has no such effect. Month, weekday, category, region and depth gave nothing.
+- 2026-11-27: A logistic regression with the new feature also reaches 0.7712 ROC-AUC, confirming that the information in the data, not the model type, is the limit. Cancelled and suspected-fraud orders always have late rate 0 (label noise); dropping them from training did not help, so they stay.
+- 2026-11-27: Caveats. The inter-state dashboard rejects zero-day transit and Same Day has 0 scheduled days in the data, so the gain does not show up in what the dashboard can score. Each mode has exactly one scheduled day count in the data, so other combinations the slider allows are extrapolations. Training reads the order date column; serving sends `dispatch_hour`.
+
+**Open:** run `python -m experiments.improve_model` and `python model_training.py --cv` after any data change; choose the dashboard classification threshold (recall is 0.5773 at 0.5; the validation sweep is in `metrics.json`); decide whether to remove or relabel Same Day for inter-state use, since it cannot be scored there; pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
 
 ---
 
@@ -151,7 +158,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Status:** done; the API computes the weather penalty itself.
 
-**What:** `FastAPI.py` serves `POST /predict` and `GET /health`. The request takes `order_quantity` (1 or more), `sales_per_customer` (0 or more), `product_price` (0 or more), `shipping_mode`, `scheduled_shipping_days` (1 or more, so zero-day transit is rejected with HTTP 422), optional `market` (defaults to Pacific Asia) and `weather_delay_penalty_pct` (0 to 100, default 0). `inference.py` loads the artifacts, scores the order, adds the penalty to the base risk and maps the total to a status (65 and 35 thresholds).
+**What:** `FastAPI.py` serves `POST /predict` and `GET /health`. Request: `order_quantity` (1 or more), `sales_per_customer` and `product_price` (0 or more, USD), `shipping_mode`, `scheduled_shipping_days` (1 to 15, so zero-day transit is rejected with HTTP 422), `destination_city`, optional `destination_state`, optional `destination_lat` and `destination_lon` (sent together, else the city is geocoded), `origin_hub`, optional `dispatch_date` and optional `dispatch_hour` (0 to 23, default the current hour in India). The API geocodes if needed, maps the country to `Market`, calls `route_weather.get_route_weather()`, scores the order with the model, adds the averaged weather penalty to the base risk and maps the total to a status (65 and 35 thresholds). `late_delivery_risk_pred` uses `PRED_THRESHOLD_PCT` (50). Response fields are listed in the README.
 
 **Why:**
 
@@ -166,6 +173,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-27: CONTRACT ADDITION. Added optional request field `dispatch_hour` (0 to 23, default the current hour in India) and response field `dispatch_hour`. It feeds the same-day order hour feature; other modes ignore it. Older clients keep working.
 - 2026-11-23: CONTRACT CHANGE (v2.0). The API now computes the weather penalty. The request field `weather_delay_penalty_pct` is no longer used (a client that still sends it is ignored) and `market` is derived from the geocoded country. Added optional request fields `destination_state`, `destination_lat`, `destination_lon` (sent together; if missing the city is geocoded) and `dispatch_date` (default today; past dates and arrivals beyond 15 days are rejected), and `scheduled_shipping_days` now has an upper limit of 15. Added response fields `weather_rain_pct`, `weather_wind_pct`, `weather_heat_pct`, `weather_worst_penalty_pct`, `weather_available`, `weather_reason`, `weather_source`, `weather_dispatch_date`, `weather_arrival_date`, `weather` (averages and worst point), `distance_km` and `market`. Existing response fields keep their names and units, so the current dashboard keeps working.
 - 2026-11-21: API and `inference.py` in the repo (logged retroactively). The dashboard posts to it at `CARGOSENSE_API` (default `http://127.0.0.1:8000`, 8 second timeout) and falls back to the static hub table if it is unreachable, tagging results `model` or `fallback`.
 
@@ -195,11 +203,13 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
-- 2026-11-23: Page 1 now uses the API for weather. Added a dispatch date picker; the request sends `dispatch_date`, destination coordinates and state. The summary card shows the penalty split, weather window, worst segment, route averages and arrival date from the response, and a "weather unavailable" warning when `weather_available` is false. Removed the dashboard's own live weather fetch and the static offline fallback (including the invented +1 day relief); if the API is down or rejects the order the dashboard shows the error and stores nothing. Removed the per-hub advisory text from the card. Page 2 and `states_cities.py` still use the hardcoded hub weather and risk until page 2 is rebuilt.
+- 2026-11-23: Page 1 now uses the API for weather. Added a dispatch date picker; the request sends `dispatch_date`, destination coordinates and state. The summary card shows the penalty split, weather window, worst segment, route averages and arrival date from the response, and a "weather unavailable" warning when `weather_available` is false. Removed the dashboard's own live weather fetch and the static offline fallback (including the invented +1 day relief); if the API is down or rejects the order the dashboard shows the error and stores nothing. Removed the per-hub advisory text from the card.
+- 2026-11-27: Added a Dispatch Time input (hourly) that is sent as `dispatch_hour`. Page 2 metrics card now shows each metric with its value before the order-hour feature ("was 69.4% before"), an Accuracy tile, and an Accuracy by shipping mode table showing before and after, so it is clear the gain is Same Day orders only.
+- 2026-11-26: Page 2 rebuilt. It now shows the real test metrics card from `metrics.json` (ROC-AUC, precision, recall, F1, test rows), hub count and nearest and furthest distance, the scored shipment's order value and value at risk (order value x late probability), and a corridor reference table (distance, terrain, indicative friction, scored risk for the scored corridor only) with terrain filter and sort. Removed the invented 20% penalty rate, $45 expedite cost and ROI, the per-hub fake base risk and weather, and the severe-weather filter. `states_cities.py` no longer holds `base_risk`, `weather_penalty`, `weather`, `temp_c`, `precip`, `wind`, `sla_days` or `advisory`, and distance is now geodesic (Geopy) instead of straight line x 1.22, so distances are about 18% shorter than before and the terrain friction bands (which use distance) shift slightly. Removed `get_static_weather`.
 - 2026-11-23: Prepared an updated `app.py`: consolidated summary card, title no longer hidden under the header (top padding 2.2rem to 4.5rem), emojis and clutter removed, solid accent on the Run button ("Run risk assessment"). Not yet confirmed applied to the repo.
 - 2026-11-21: Replaced CSV input with the single-order flow (`validate_inputs`, `get_prediction`, session-state results), added `status_from_risk` and `get_arrival_weather`, removed fake metrics. Results are tied to the exact payload, so an input change needs a re-run. The Run button sits above the sidebar panels.
 
-**Open:** confirm the update was applied against the latest local `app.py`; restyle page 2; remove its placeholder numbers and add the real metrics card from `models/metrics.json`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`, cache or localise the state borders).
+**Open:** confirm the update was applied against the latest local `app.py`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`, cache or localise the state borders).
 
 ---
 
@@ -229,14 +239,16 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Status:** numbers recorded; PS figures replaced.
 
-**What:** Test results (XGBoost, threshold 0.5): ROC-AUC 0.7426, accuracy 0.6940, F1 0.6578, precision 0.8500, recall 0.5365. The PS reported 0.91 ROC-AUC and 89.4% accuracy; these are not our results and must not appear in the docs.
+**What:** Test results (XGBoost, threshold 0.5, 36,104 test rows): ROC-AUC 0.7718, accuracy 71.7%, F1 0.6910, precision 0.8607, recall 0.5773. Before the order-hour feature (2026-11-27): ROC-AUC 0.7426, accuracy 69.4%, F1 0.6578, precision 0.8500, recall 0.5365. The PS reported 0.91 ROC-AUC and 89.4% accuracy; these are not our results and must not appear in the docs.
 
-**Overfitting check:** validation AUC 0.7393 against test 0.7426, early stopping at iteration 53 of 300, test calibration close, and simple models match XGBoost. So the limit is the features, not overfitting. Train AUC was not recorded.
+**Overfitting check:** train ROC-AUC 0.7813, validation 0.7705, test 0.7718, and 5-fold grouped CV 0.7719 (std 0.0010), so the gap is small. Test calibration is close and a logistic regression matches XGBoost, so the limit is the information in the data, not overfitting or the model type.
 
 **Limitations to state openly:**
 
 - Trained on DataCo (US-heavy) and not validated on Indian routes. We do not add synthetic Indian data, since invented outcomes would make the model look India-ready when it is not.
 - First Class shows about 0.998 late in this dataset, which is a dataset quirk.
+- The accuracy gain is Same Day only; the dashboard cannot score Same Day (zero-day rejected), so for inter-state orders accuracy is about 70.3% and at the dataset's ceiling.
+- Each shipping mode has one scheduled day count in the training data; other combinations are extrapolations.
 - The weather penalty is rule-based with no measured accuracy.
 - Geodesic distance underestimates road distance.
 - All money is in USD, with no conversion.
@@ -251,9 +263,9 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 ## 9. Testing
 
-**Status:** weather modules covered; model and API not yet.
+**Status:** weather, geocoding, API contract and the order-hour feature covered.
 
-**What:** 32 passing tests in `tests/`: 22 for `weather_penalty.py` (band boundaries, probability scaling, cap, monotonic growth, validation) and 10 for `weather_utils.py` (parsing, wrong date, failure, caching, invalid days) using fake responses, so no network is needed. Run from the repo root: `python -m unittest discover -s tests -t . -v`.
+**What:** 65 passing tests in `tests/`: 22 for `weather_penalty.py` (band boundaries, probability scaling, cap, monotonic growth, validation), 10 for `weather_utils.py` (parsing, wrong date, failure, caching, invalid days), 13 for `route_weather.py` (sampling, day mapping, averaging, failure, dispatch date), 5 for `geo_utils.py`, 10 for the `/predict` contract (real model, faked weather and geocoding) and 5 for the order-hour feature (derived only for Same Day, learned cut-off, no leakage columns). All use fake responses, so no network is needed. Run from the repo root: `python -m unittest discover -s tests -t . -v`.
 
 **Why:** the weather work cannot be checked against real outcomes, so the tests lock in the rules and the failure behaviour.
 
@@ -263,7 +275,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 - 2026-11-23: Tests moved into `tests/` with `tests/__init__.py`. App modules stay in the repo root.
 
-**Open:** add tests for `inference.py` and the API.
+**Open:** direct tests for the status thresholds in `inference.py`; live checks are manual (`experiments/`).
 
 ---
 
@@ -296,11 +308,8 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 ## 12. Open items
 
-1. Wire the weather into the API and dashboard (contract change).
-2. Build Geopy geocoding and decide on `Market`.
-3. Confirm the 65 and 35 status thresholds and choose the dashboard threshold.
-4. Restyle page 2 and add the real metrics card.
-5. Record train AUC; update all docs with the real metrics.
-6. Fix the speed and the theme toggle.
-7. Repo cleanup: root README, rename SmartFreight, pin requirements, `.gitignore`.
-8. Rehearse the demo and record a backup video.
+1. Live checks locally: the dashboard against the live API, one Nominatim lookup.
+2. Decide the classification threshold (50 or 40) and whether to move the 35 status cutoff: the base risk is bunched at 37 to 42% or above 70%, so STABLE is almost empty.
+3. Decide what to do with Same Day for inter-state use (the dashboard cannot score it) and how to treat scheduled-days values the model never saw.
+4. Repo cleanup: root README, rename SmartFreight, pin requirements, `.gitignore`, UTF-8 `training_output.txt`, theme toggle, emojis, comments, `AGENTS.md`.
+5. Rehearse the demo and record a backup video.

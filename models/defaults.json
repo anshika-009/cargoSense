@@ -4,6 +4,7 @@
   "Order Item Quantity": 1.0,
   "Order Item Product Price": 59.99000168,
   "Order Item Discount": 14.0,
+  "same_day_order_hour": -1.0,
   "Type": "DEBIT",
   "Shipping Mode": "Standard Class",
   "Customer Segment": "Consumer",

@@ -7,12 +7,14 @@ import json
 from pathlib import Path
 
 import joblib
+from xgboost import XGBClassifier
 
 import feature_data as fd
 
 MODELS_DIR = Path(__file__).parent / "models"
 CRITICAL_THRESHOLD = 65
 MODERATE_THRESHOLD = 35
+PRED_THRESHOLD_PCT = 50
 DEFAULT_MARKET = "Pacific Asia"  # all deployed routes are Delhi to India
 
 STATUS_STABLE = "STABLE OPTIMAL ROUTE"
@@ -29,7 +31,12 @@ def status_from_risk(total_pct):
 
 
 def load_artifacts(models_dir=MODELS_DIR):
-    model = joblib.load(models_dir / "final_xgb_model.pkl")
+    json_path = models_dir / "final_xgb_model.json"
+    if json_path.exists():
+        model = XGBClassifier()
+        model.load_model(json_path)
+    else:
+        model = joblib.load(models_dir / "final_xgb_model.pkl")
     columns = joblib.load(models_dir / "processed_data_pipeline.pkl")
     defaults = json.loads((models_dir / "defaults.json").read_text())
     return model, columns, defaults
@@ -45,12 +52,15 @@ def score_order(model, columns, defaults, order, weather_penalty_pct=0.0):
         "Shipping Mode": order["shipping_mode"],
         "Market": order.get("market") or DEFAULT_MARKET,
     }
+    if order.get("dispatch_hour") is not None:
+        values["order_hour"] = order["dispatch_hour"]
+        values["same_day_order_hour"] = order["dispatch_hour"]
     X = fd.encode_inference(fd.row_to_features(values, defaults), columns)
     base_pct = round(float(model.predict_proba(X)[0][1]) * 100, 1)
     total_pct = min(round(base_pct + weather_penalty_pct, 1), 100.0)
     return {
         "late_delivery_risk_prob": round(total_pct / 100, 4),
-        "late_delivery_risk_pred": int(total_pct >= 50),
+        "late_delivery_risk_pred": int(total_pct >= PRED_THRESHOLD_PCT),
         "base_risk_pct": base_pct,
         "weather_delay_penalty_pct": float(weather_penalty_pct),
         "status": status_from_risk(total_pct),
