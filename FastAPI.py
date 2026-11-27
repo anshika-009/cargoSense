@@ -3,7 +3,7 @@ CargoSense | FastAPI.py
 Purpose: serve POST /predict. The XGBoost model gives the base risk; the server computes a
 rule-based route weather penalty (route_weather.py) and adds it on top.
 Input: order fields, destination (city, optional state or coordinates), optional dispatch date.
-Output: total risk, base risk, weather penalty and its split, weather values, status, availability.
+Output: total risk, base risk, weather penalty and its split, route (slack and terrain) penalty, weather values, status, availability.
 Notes: if weather cannot be fetched the penalty is 0 and weather_available is False.
 dispatch_hour (0 to 23) feeds the order_hour feature; it defaults to the current hour in India.
 Run: uvicorn FastAPI:app --reload
@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, model_validator
 
 import geo_utils
 import inference
+import route_penalty
 import route_weather
 
 app = FastAPI(title="CargoSense API", version="2.0")
@@ -67,6 +68,11 @@ class PredictResponse(BaseModel):
     weather_wind_pct: float
     weather_heat_pct: float
     weather_worst_penalty_pct: float
+    route_penalty_pct: float
+    route_slack_pct: float
+    route_terrain_pct: float
+    required_km_per_day: float
+    terrain_class: str
     weather_available: bool
     weather_reason: Optional[str]
     weather_source: str
@@ -114,21 +120,25 @@ def predict(req: PredictRequest):
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
+    distance = geo_utils.distance_km(geo_utils.ORIGIN_COORDS, destination)
+    route = route_penalty.compute_route_penalty(distance, req.scheduled_shipping_days, req.destination_state)
     hour = req.dispatch_hour if req.dispatch_hour is not None else datetime.now(INDIA_TZ).hour
     scored = inference.score_order(
         MODEL, COLUMNS, DEFAULTS, dict(req.model_dump(), market=market, dispatch_hour=hour),
-        weather_penalty_pct=weather["penalty_mean"],
+        weather_penalty_pct=weather["penalty_mean"], route_penalty_pct=route["total"],
     )
     split = weather["penalty_split"]
     return dict(
         scored,
         weather_rain_pct=split["rain"], weather_wind_pct=split["wind"], weather_heat_pct=split["heat"],
+        route_slack_pct=route["slack"], route_terrain_pct=route["terrain"],
+        required_km_per_day=route["required_km_per_day"], terrain_class=route["terrain_class"],
         weather_worst_penalty_pct=weather["penalty_worst"],
         weather_available=weather["available"], weather_reason=weather["reason"],
         weather_source=weather["route_source"],
         weather_dispatch_date=weather["dispatch_date"], weather_arrival_date=weather["arrival_date"],
         weather=weather_values(weather),
-        distance_km=geo_utils.distance_km(geo_utils.ORIGIN_COORDS, destination),
+        distance_km=distance,
         dispatch_hour=hour,
         market=market,
     )

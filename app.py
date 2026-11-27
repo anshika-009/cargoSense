@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 from api_client import build_payload, run_and_store_assessment
-from corridor_view import render_corridor_intelligence, render_model_sidebar
+from corridor import render_corridor_intelligence, render_model_sidebar
 from route_weather import FORECAST_HORIZON_DAYS
 from simulator_view import render_simulator_page
 from states_cities import INDIA_STATES_CITIES, ORIGIN_HUB, get_hub_record

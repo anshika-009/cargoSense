@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from api_client import run_and_store_assessment
-from map_deck import build_clean_map_deck
+from map import build_clean_map_deck
 from states_cities import ORIGIN_HUB, get_all_city_records
 from theme import (
     ACCENT,
@@ -122,6 +122,11 @@ def render_shipment_summary_card(
     else:
         worst_text = avg_text = temp_text = "n/a"
     penalty_text = "Unavailable" if (current_pred and not weather_info["available"]) else f"+{weather_pct:.1f}%"
+    route_penalty_text = (
+        f"+{current_pred.get('route_penalty_pct', 0.0):.1f}% "
+        f"(slack {current_pred.get('route_slack_pct', 0.0):.1f} · terrain {current_pred.get('route_terrain_pct', 0.0):.1f})"
+        if current_pred else "--"
+    )
 
     terrain_info = get_terrain_profile(active_hub_rec["state"], active_hub_rec["dist"])
 
@@ -175,6 +180,7 @@ def render_shipment_summary_card(
         f'<div class="left-stat-row"><span class="left-stat-label">ML Total Risk</span><span class="left-stat-val" style="color: {total_color};">{total_display}</span></div>'
         f'<div class="left-stat-row"><span class="left-stat-label">ML Base Risk</span><span class="left-stat-val">{base_display}</span></div>'
         f'<div class="left-stat-row"><span class="left-stat-label">Weather Penalty (route avg)</span><span class="left-stat-val" style="color: {CRIT_TEXT if weather_pct > 0 else TEXT_MAIN};">{penalty_text}</span></div>'
+        f'<div class="left-stat-row"><span class="left-stat-label">Route Penalty (distance + terrain)</span><span class="left-stat-val">{route_penalty_text}</span></div>'
         f'<div class="left-stat-row"><span class="left-stat-label">Penalty Split</span><span class="left-stat-val">{weather_note}</span></div>'
         f'<div class="left-stat-row"><span class="left-stat-label">Route Distance</span><span class="left-stat-val">{route_km:,.0f} km</span></div>'
         f'<div class="left-stat-row"><span class="left-stat-label">Shipping Mode</span><span class="left-stat-val">{current_mode}</span></div>'

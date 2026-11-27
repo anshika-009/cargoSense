@@ -46,7 +46,11 @@ class ApiTests(unittest.TestCase):
         data = r.json()
         self.assertTrue(data["weather_available"])
         self.assertEqual(data["weather_delay_penalty_pct"], 8.0)
-        self.assertAlmostEqual(data["late_delivery_risk_prob"] * 100, min(data["base_risk_pct"] + 8.0, 100.0), places=1)
+        self.assertGreater(data["route_penalty_pct"], 0)
+        self.assertAlmostEqual(
+            data["late_delivery_risk_prob"] * 100,
+            min(data["base_risk_pct"] + 8.0 + data["route_penalty_pct"], 100.0), places=1,
+        )
         self.assertEqual(data["market"], "Pacific Asia")
         self.assertTrue(1700 < data["distance_km"] < 1800)
 
@@ -55,7 +59,10 @@ class ApiTests(unittest.TestCase):
             data = self.post().json()
         self.assertFalse(data["weather_available"])
         self.assertEqual(data["weather_delay_penalty_pct"], 0.0)
-        self.assertAlmostEqual(data["late_delivery_risk_prob"] * 100, data["base_risk_pct"], places=1)
+        self.assertAlmostEqual(
+            data["late_delivery_risk_prob"] * 100,
+            min(data["base_risk_pct"] + data["route_penalty_pct"], 100.0), places=1,
+        )
 
     def test_hour_does_not_change_other_modes(self):
         with mock.patch.object(route_weather, "get_route_weather", return_value=fake_weather(penalty=0.0)):
