@@ -42,7 +42,7 @@ def load_artifacts(models_dir=MODELS_DIR):
     return model, columns, defaults
 
 
-def score_order(model, columns, defaults, order, weather_penalty_pct=0.0):
+def score_order(model, columns, defaults, order, weather_penalty_pct=0.0, route_penalty_pct=0.0):
     """order: dict with the API field names. Returns the PredictResponse fields."""
     values = {
         "Days for shipment (scheduled)": order["scheduled_shipping_days"],
@@ -57,11 +57,12 @@ def score_order(model, columns, defaults, order, weather_penalty_pct=0.0):
         values["same_day_order_hour"] = order["dispatch_hour"]
     X = fd.encode_inference(fd.row_to_features(values, defaults), columns)
     base_pct = round(float(model.predict_proba(X)[0][1]) * 100, 1)
-    total_pct = min(round(base_pct + weather_penalty_pct, 1), 100.0)
+    total_pct = min(round(base_pct + weather_penalty_pct + route_penalty_pct, 1), 100.0)
     return {
         "late_delivery_risk_prob": round(total_pct / 100, 4),
         "late_delivery_risk_pred": int(total_pct >= PRED_THRESHOLD_PCT),
         "base_risk_pct": base_pct,
         "weather_delay_penalty_pct": float(weather_penalty_pct),
+        "route_penalty_pct": float(route_penalty_pct),
         "status": status_from_risk(total_pct),
     }
