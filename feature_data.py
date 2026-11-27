@@ -1,6 +1,11 @@
 """
 CargoSense | feature_data.py
 Purpose: select leakage-free features, build the target, one-hot encode, and compute UI defaults.
+Notes: order_hour (0 to 23) comes from the order timestamp, which is known before dispatch (in
+serving it is the dispatch hour). The model uses it only through same_day_order_hour, which equals
+the hour for Same Day orders and -1 for every other mode: in the data only Same Day has a cut-off
+rule (orders before noon are never late, after noon almost always are), and a raw hour feature
+would add a spurious hour effect to the other modes. The shipping date column is never used.
 Input: raw DataCo DataFrames (train or test), or a dict of UI values for a single order.
 Output: feature matrix X, target y, the encoded column list, and a defaults dict.
 Used by: model_training.py (training, evaluation) and the API (inference).
@@ -9,13 +14,16 @@ import pandas as pd
 
 TARGET = "Late_delivery_risk"
 GROUP_COLUMN = "Order Id"
+ORDER_DATE_COLUMN = "order date (DateOrders)"
 NUMERIC_FEATURES = [
     "Days for shipment (scheduled)",
     "Sales per customer",
     "Order Item Quantity",
     "Order Item Product Price",
     "Order Item Discount",
+    "same_day_order_hour",
 ]
+NO_HOUR = -1
 CATEGORICAL_FEATURES = [
     "Type",
     "Shipping Mode",
@@ -44,7 +52,17 @@ def clean_categories(df):
     return df
 
 
+def add_time_features(df):
+    if "order_hour" not in df.columns:
+        df = df.assign(order_hour=pd.to_datetime(df[ORDER_DATE_COLUMN]).dt.hour)
+    if "same_day_order_hour" not in df.columns:
+        same_day = df["Shipping Mode"].astype(str).str.split().str.join(" ") == "Same Day"
+        df = df.assign(same_day_order_hour=df["order_hour"].where(same_day, NO_HOUR))
+    return df
+
+
 def select_features(df):
+    df = add_time_features(df)
     missing = [c for c in FEATURES if c not in df.columns]
     if missing:
         raise KeyError(f"missing feature columns: {missing}")
@@ -77,5 +95,6 @@ def compute_defaults(df):
 
 
 def row_to_features(values, defaults):
-    row = {column: values.get(column, defaults[column]) for column in FEATURES}
-    return clean_categories(pd.DataFrame([row]))
+    row = {column: values.get(column, defaults[column]) for column in FEATURES if column != "same_day_order_hour"}
+    row["order_hour"] = values.get("order_hour", NO_HOUR)
+    return clean_categories(add_time_features(pd.DataFrame([row])))[FEATURES]

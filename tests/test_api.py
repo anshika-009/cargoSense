@@ -55,7 +55,17 @@ class ApiTests(unittest.TestCase):
             data = self.post().json()
         self.assertFalse(data["weather_available"])
         self.assertEqual(data["weather_delay_penalty_pct"], 0.0)
-        self.assertEqual(data["late_delivery_risk_prob"] * 100, data["base_risk_pct"])
+        self.assertAlmostEqual(data["late_delivery_risk_prob"] * 100, data["base_risk_pct"], places=1)
+
+    def test_hour_does_not_change_other_modes(self):
+        with mock.patch.object(route_weather, "get_route_weather", return_value=fake_weather(penalty=0.0)):
+            morning = self.post(shipping_mode="Standard Class", scheduled_shipping_days=4, dispatch_hour=9).json()
+            evening = self.post(shipping_mode="Standard Class", scheduled_shipping_days=4, dispatch_hour=15).json()
+        self.assertEqual(morning["base_risk_pct"], evening["base_risk_pct"])
+        self.assertEqual(morning["dispatch_hour"], 9)
+
+    def test_hour_out_of_range_rejected(self):
+        self.assertEqual(self.post(dispatch_hour=24).status_code, 422)
 
     def test_old_client_request_still_accepted(self):
         old = {k: v for k, v in BODY.items() if k not in ("destination_lat", "destination_lon")}

@@ -4,12 +4,16 @@ Purpose: split, train, evaluate and save the leakage-free late-delivery XGBoost 
 Input: data/train.csv and data/test.csv (DataCo). Both files are pooled and re-split grouped by
 Order Id, because the provided files share Order Ids (items of one order sit in both files).
 Output: models/final_xgb_model.pkl, processed_data_pipeline.pkl, defaults.json, metrics.json.
-Run: python model_training.py
+Notes: baseline_without_order_hour is a second XGBoost trained the same way without the same-day
+order hour feature, so metrics.json always shows the before and after of that change on the same split.
+Run: python model_training.py        (add --cv for 5-fold grouped cross-validation)
 """
 import json
+import sys
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -131,6 +135,61 @@ def fit_baselines(X_train, y_train):
     return {"logistic_regression": logistic.fit(X_train, y_train), "random_forest": forest.fit(X_train, y_train)}
 
 
+def mode_table(test_df, y_test, proba_new, proba_base):
+    rows = {}
+    for mode, group in test_df.groupby("Shipping Mode"):
+        position = test_df.index.get_indexer(group.index)
+        y_mode = y_test.to_numpy()[position]
+        late_rate = float(y_mode.mean())
+        rows[mode] = {
+            "rows": int(len(position)),
+            "late_rate": late_rate,
+            "accuracy": float(accuracy_score(y_mode, proba_new[position] >= THRESHOLD)),
+            "accuracy_without_order_hour": float(accuracy_score(y_mode, proba_base[position] >= THRESHOLD)),
+            "accuracy_of_guessing_majority": max(late_rate, 1 - late_rate),
+        }
+    return rows
+
+
+def accuracy_ceiling(df):
+    hour = pd.to_datetime(df[fd.ORDER_DATE_COLUMN]).dt.hour
+    afternoon = (df["Shipping Mode"] == "Same Day") & (hour >= 12)
+    groups = df["Shipping Mode"].astype(str) + afternoon.map({True: "_pm", False: ""})
+    rate = df[fd.TARGET].groupby(groups).agg(["mean", "size"])
+    best = np.maximum(rate["mean"], 1 - rate["mean"])
+    return float((best * rate["size"]).sum() / rate["size"].sum())
+
+
+def cross_validate(df, folds=5):
+    y = fd.get_target(df)
+    splitter = StratifiedGroupKFold(n_splits=folds, shuffle=True, random_state=RANDOM_STATE)
+    scores = []
+    for train_idx, test_idx in splitter.split(df, y, df[fd.GROUP_COLUMN]):
+        train_part, test_part = df.iloc[train_idx], df.iloc[test_idx]
+        X_train, columns = fd.encode_train(fd.select_features(train_part))
+        X_test = fd.encode_inference(fd.select_features(test_part), columns)
+        model = XGBClassifier(
+            n_estimators=53, max_depth=5, learning_rate=0.1, tree_method="hist",
+            random_state=RANDOM_STATE, n_jobs=-1,
+        )
+        model.fit(X_train, fd.get_target(train_part))
+        proba = model.predict_proba(X_test)[:, 1]
+        scores.append(
+            {
+                "roc_auc": float(roc_auc_score(fd.get_target(test_part), proba)),
+                "accuracy": float(accuracy_score(fd.get_target(test_part), proba >= THRESHOLD)),
+            }
+        )
+    return {
+        "folds": folds,
+        "per_fold": scores,
+        "roc_auc_mean": float(np.mean([s["roc_auc"] for s in scores])),
+        "roc_auc_std": float(np.std([s["roc_auc"] for s in scores])),
+        "accuracy_mean": float(np.mean([s["accuracy"] for s in scores])),
+        "accuracy_std": float(np.std([s["accuracy"] for s in scores])),
+    }
+
+
 def sanity_checks(model, columns, defaults, test_auc):
     if test_auc > SUSPICIOUS_AUC:
         print(f"WARNING: test ROC-AUC {test_auc:.4f} is above {SUSPICIOUS_AUC}; re-check for leakage")
@@ -138,7 +197,12 @@ def sanity_checks(model, columns, defaults, test_auc):
     if importances.iloc[0] > DOMINANT_SHARE:
         print(f"WARNING: {importances.index[0]} holds {importances.iloc[0]:.2f} of total importance")
     cases = {
-        "Same Day, 0 scheduled days": {"Shipping Mode": "Same Day", "Days for shipment (scheduled)": 0},
+        "Same Day, 0 scheduled days, ordered 09:00": {
+            "Shipping Mode": "Same Day", "Days for shipment (scheduled)": 0, "order_hour": 9,
+        },
+        "Same Day, 0 scheduled days, ordered 15:00": {
+            "Shipping Mode": "Same Day", "Days for shipment (scheduled)": 0, "order_hour": 15,
+        },
         "First Class, 1 scheduled day": {"Shipping Mode": "First Class", "Days for shipment (scheduled)": 1},
         "Standard Class, 4 scheduled days": {"Shipping Mode": "Standard Class", "Days for shipment (scheduled)": 4},
     }
@@ -165,6 +229,14 @@ def main():
 
     model = fit_xgb(X_train, y_train, X_val, y_val)
 
+    train_auc = float(roc_auc_score(y_train, model.predict_proba(X_train)[:, 1]))
+    val_auc = float(roc_auc_score(y_val, model.predict_proba(X_val)[:, 1]))
+    without_hour = [c for c in columns if c != "same_day_order_hour"]
+    previous = fit_xgb(X_train[without_hour], y_train, X_val[without_hour], y_val)
+    previous_proba = previous.predict_proba(X_test[without_hour])[:, 1]
+    previous_scores = evaluate(y_test, previous_proba)
+    by_mode = mode_table(test_df, y_test, model.predict_proba(X_test)[:, 1], previous_proba)
+
     baselines = fit_baselines(X_train, y_train)
     results = {name: evaluate(y_test, m.predict_proba(X_test)[:, 1]) for name, m in baselines.items()}
     results["xgboost"] = evaluate(y_test, model.predict_proba(X_test)[:, 1])
@@ -172,6 +244,13 @@ def main():
         print(f"\n{name}")
         print({k: round(v, 4) for k, v in scores.items() if k != "confusion_matrix"})
         print("confusion matrix:", scores["confusion_matrix"])
+
+    print(f"\nROC-AUC: train {train_auc:.4f}, validation {val_auc:.4f}, test {results['xgboost']['roc_auc']:.4f}")
+    print("\nwithout order_hour (previous model):", {k: round(v, 4) for k, v in previous_scores.items() if k != "confusion_matrix"})
+    print("\naccuracy by shipping mode on test (new / without order_hour / guessing the majority):")
+    print(pd.DataFrame(by_mode).T.round(4).to_string())
+    ceiling = accuracy_ceiling(pooled)
+    print(f"\naccuracy ceiling for this dataset: {ceiling:.4f}")
 
     defaults = fd.compute_defaults(fd.select_features(train_df))
     importances, hand_made = sanity_checks(model, columns, defaults, results["xgboost"]["roc_auc"])
@@ -194,7 +273,13 @@ def main():
         "split": "pooled train+test, StratifiedGroupKFold by Order Id (test 1/5, validation 1/6 of rest)",
         "random_state": RANDOM_STATE,
         "rows": sizes,
+        "train_roc_auc": train_auc,
+        "validation_roc_auc": val_auc,
         "best_iteration": int(model.best_iteration),
+        "baseline_without_order_hour": previous_scores,
+        "by_shipping_mode": by_mode,
+        "accuracy_ceiling": ceiling,
+        "cross_validation": cross_validate(pooled) if "--cv" in sys.argv else None,
         "baselines": {name: results[name] for name in baselines},
         "hand_made_rows": hand_made,
         "threshold_sweep_validation": sweep,

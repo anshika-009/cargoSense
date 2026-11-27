@@ -1,17 +1,17 @@
 {
-  "roc_auc": 0.7426260255360408,
-  "accuracy": 0.6939674274318635,
-  "f1": 0.657809161014587,
-  "precision": 0.850008003841844,
-  "recall": 0.5364991159383683,
+  "roc_auc": 0.7718058905052154,
+  "accuracy": 0.7169842676711722,
+  "f1": 0.6910377358490566,
+  "precision": 0.8606612939670106,
+  "recall": 0.577266986612781,
   "confusion_matrix": [
     [
-      14435,
-      1874
+      14459,
+      1850
     ],
     [
-      9175,
-      10620
+      8368,
+      11427
     ]
   ],
   "threshold": 0.5,
@@ -22,173 +22,259 @@
     "validation": 24069,
     "test": 36104
   },
-  "best_iteration": 53,
+  "train_roc_auc": 0.7812736705375514,
+  "validation_roc_auc": 0.7705289412610387,
+  "best_iteration": 52,
+  "baseline_without_order_hour": {
+    "roc_auc": 0.7426260255360408,
+    "accuracy": 0.6939674274318635,
+    "f1": 0.657809161014587,
+    "precision": 0.850008003841844,
+    "recall": 0.5364991159383683,
+    "confusion_matrix": [
+      [
+        14435,
+        1874
+      ],
+      [
+        9175,
+        10620
+      ]
+    ]
+  },
+  "by_shipping_mode": {
+    "First Class": {
+      "rows": 5552,
+      "late_rate": 0.9627161383285303,
+      "accuracy": 0.9627161383285303,
+      "accuracy_without_order_hour": 0.9627161383285303,
+      "accuracy_of_guessing_majority": 0.9627161383285303
+    },
+    "Same Day": {
+      "rows": 1845,
+      "late_rate": 0.46720867208672084,
+      "accuracy": 0.9831978319783198,
+      "accuracy_without_order_hour": 0.5327913279132791,
+      "accuracy_of_guessing_majority": 0.5327913279132792
+    },
+    "Second Class": {
+      "rows": 6832,
+      "late_rate": 0.7640515222482436,
+      "accuracy": 0.7640515222482436,
+      "accuracy_without_order_hour": 0.7640515222482436,
+      "accuracy_of_guessing_majority": 0.7640515222482436
+    },
+    "Standard Class": {
+      "rows": 21875,
+      "late_rate": 0.38253714285714285,
+      "accuracy": 0.6174628571428571,
+      "accuracy_without_order_hour": 0.6174628571428571,
+      "accuracy_of_guessing_majority": 0.6174628571428571
+    }
+  },
+  "accuracy_ceiling": 0.7188329206343931,
+  "cross_validation": {
+    "folds": 5,
+    "per_fold": [
+      {
+        "roc_auc": 0.7723302036443167,
+        "accuracy": 0.7169842676711722
+      },
+      {
+        "roc_auc": 0.7712876160236514,
+        "accuracy": 0.7214713051185464
+      },
+      {
+        "roc_auc": 0.773196903981068,
+        "accuracy": 0.7211666297363173
+      },
+      {
+        "roc_auc": 0.7702267940449044,
+        "accuracy": 0.7159317527143807
+      },
+      {
+        "roc_auc": 0.7725446310332118,
+        "accuracy": 0.7186106417749217
+      }
+    ],
+    "roc_auc_mean": 0.7719172297454304,
+    "roc_auc_std": 0.001044579557783056,
+    "accuracy_mean": 0.7188329194030676,
+    "accuracy_std": 0.0022041312042852426
+  },
   "baselines": {
     "logistic_regression": {
-      "roc_auc": 0.7424583106896582,
-      "accuracy": 0.6939397296698426,
-      "f1": 0.6574493148986298,
-      "precision": 0.8508384819064431,
-      "recall": 0.5356908310179338,
+      "roc_auc": 0.7711921544348799,
+      "accuracy": 0.716374916906714,
+      "f1": 0.6901664145234493,
+      "precision": 0.8604300264051301,
+      "recall": 0.5761555948471836,
       "confusion_matrix": [
         [
-          14450,
-          1859
+          14459,
+          1850
         ],
         [
-          9191,
-          10604
+          8390,
+          11405
         ]
       ]
     },
     "random_forest": {
-      "roc_auc": 0.741155298799636,
-      "accuracy": 0.6938566363837801,
-      "f1": 0.6608572918903992,
-      "precision": 0.8415911222256955,
-      "recall": 0.5440262692599142,
+      "roc_auc": 0.7713462292564022,
+      "accuracy": 0.7169842676711722,
+      "f1": 0.6910377358490566,
+      "precision": 0.8606612939670106,
+      "recall": 0.577266986612781,
       "confusion_matrix": [
         [
-          14282,
-          2027
+          14459,
+          1850
         ],
         [
-          9026,
-          10769
+          8368,
+          11427
         ]
       ]
     }
   },
   "hand_made_rows": {
-    "Same Day, 0 scheduled days": 0.48719945549964905,
-    "First Class, 1 scheduled day": 0.997951090335846,
-    "Standard Class, 4 scheduled days": 0.38966646790504456
+    "Same Day, 0 scheduled days, ordered 09:00": 0.005305754020810127,
+    "Same Day, 0 scheduled days, ordered 15:00": 0.9937220215797424,
+    "First Class, 1 scheduled day": 0.9977428913116455,
+    "Standard Class, 4 scheduled days": 0.3907403349876404
   },
   "threshold_sweep_validation": [
     {
       "threshold": 0.3,
-      "precision": 0.5485051353486632,
-      "recall": 0.9995453512161855,
-      "f1": 0.7083176716962896,
-      "share_flagged": 0.9991690556317254
+      "precision": 0.5642078255291854,
+      "recall": 0.9997726756080928,
+      "f1": 0.7213383631294079,
+      "share_flagged": 0.9715817026050106
     },
     {
       "threshold": 0.35,
-      "precision": 0.5727743319498204,
-      "recall": 0.9306660604682883,
-      "f1": 0.709122401847575,
-      "share_flagged": 0.8908970044455524
+      "precision": 0.5916743041821427,
+      "recall": 0.9294536637114496,
+      "f1": 0.7230605989153501,
+      "share_flagged": 0.8613153849349786
     },
     {
       "threshold": 0.4,
-      "precision": 0.6830005158057623,
-      "recall": 0.7023565961961051,
-      "f1": 0.6925433353257621,
-      "share_flagged": 0.5638373010926918
+      "precision": 0.7274970155192997,
+      "recall": 0.6926574221413958,
+      "f1": 0.7096498719043552,
+      "share_flagged": 0.5220407993684822
     },
     {
       "threshold": 0.45,
-      "precision": 0.8131891433418151,
-      "recall": 0.5811926953095401,
-      "f1": 0.6778912015555261,
-      "share_flagged": 0.39187336407827494
+      "precision": 0.8590264806065268,
+      "recall": 0.5924073653102978,
+      "f1": 0.7012288097587227,
+      "share_flagged": 0.37812123478333126
     },
     {
       "threshold": 0.5,
-      "precision": 0.850433356758023,
-      "recall": 0.5502008032128514,
-      "f1": 0.668138946399816,
-      "share_flagged": 0.35473015081640286
+      "precision": 0.8599405875233799,
+      "recall": 0.592255815715693,
+      "f1": 0.701426904783272,
+      "share_flagged": 0.3776226681623665
     },
     {
       "threshold": 0.55,
-      "precision": 0.8530419373892498,
-      "recall": 0.5471698113207547,
-      "f1": 0.6666974425260825,
-      "share_flagged": 0.35169720387220077
+      "precision": 0.8599405875233799,
+      "recall": 0.592255815715693,
+      "f1": 0.701426904783272,
+      "share_flagged": 0.3776226681623665
     },
     {
       "threshold": 0.6,
-      "precision": 0.8530072078459175,
-      "recall": 0.5470182617261499,
-      "f1": 0.6665743305632502,
-      "share_flagged": 0.3516141094353733
+      "precision": 0.8599405875233799,
+      "recall": 0.592255815715693,
+      "f1": 0.701426904783272,
+      "share_flagged": 0.3776226681623665
     },
     {
       "threshold": 0.65,
-      "precision": 0.8544578313253012,
-      "recall": 0.5373948624687429,
-      "f1": 0.6598129971623947,
-      "share_flagged": 0.3448419128339358
+      "precision": 0.8615264449899576,
+      "recall": 0.5850572099719633,
+      "f1": 0.6968726025542669,
+      "share_flagged": 0.3723461714238232
     },
     {
       "threshold": 0.7,
-      "precision": 0.8751185155086009,
-      "recall": 0.4895809653709176,
-      "f1": 0.6278911564625851,
-      "share_flagged": 0.30674311354854794
+      "precision": 0.881413057046561,
+      "recall": 0.535045843752368,
+      "f1": 0.6658807996982271,
+      "share_flagged": 0.3328347667123686
     }
   ],
   "calibration_test": [
     {
+      "bin": "(-0.001, 0.1]",
+      "mean_predicted": 0.006039186380803585,
+      "observed_late_rate": 0.0,
+      "count": 952
+    },
+    {
       "bin": "(0.2, 0.3]",
-      "mean_predicted": 0.277910977602005,
-      "observed_late_rate": 0.3793103448275862,
-      "count": 29
+      "mean_predicted": 0.29156339168548584,
+      "observed_late_rate": 0.46153846153846156,
+      "count": 13
     },
     {
       "bin": "(0.3, 0.4]",
-      "mean_predicted": 0.37156227231025696,
-      "observed_late_rate": 0.37535852350667165,
-      "count": 16038
+      "mean_predicted": 0.37431827187538147,
+      "observed_late_rate": 0.3765216343256599,
+      "count": 16594
     },
     {
       "bin": "(0.4, 0.5]",
-      "mean_predicted": 0.4209274649620056,
-      "observed_late_rate": 0.4168102876839454,
-      "count": 7543
+      "mean_predicted": 0.40754809975624084,
+      "observed_late_rate": 0.40129081245254367,
+      "count": 5268
     },
     {
       "bin": "(0.5, 0.6]",
-      "mean_predicted": 0.5132208466529846,
-      "observed_late_rate": 0.5,
-      "count": 110
+      "mean_predicted": 0.5966795086860657,
+      "observed_late_rate": 1.0,
+      "count": 1
     },
     {
       "bin": "(0.6, 0.7]",
-      "mean_predicted": 0.6696911454200745,
-      "observed_late_rate": 0.6826568265682657,
-      "count": 1626
+      "mean_predicted": 0.6697386503219604,
+      "observed_late_rate": 0.6855189558732132,
+      "count": 1609
     },
     {
       "bin": "(0.7, 0.8]",
-      "mean_predicted": 0.776494562625885,
-      "observed_late_rate": 0.7907874420998456,
-      "count": 3886
+      "mean_predicted": 0.7766289710998535,
+      "observed_late_rate": 0.7926829268292683,
+      "count": 4100
     },
     {
       "bin": "(0.8, 0.9]",
-      "mean_predicted": 0.822443425655365,
-      "observed_late_rate": 0.8265709156193896,
-      "count": 2785
+      "mean_predicted": 0.8221678137779236,
+      "observed_late_rate": 0.8288062902072909,
+      "count": 2798
     },
     {
       "bin": "(0.9, 1.0]",
-      "mean_predicted": 0.9973133206367493,
-      "observed_late_rate": 0.9982872522632737,
-      "count": 4087
+      "mean_predicted": 0.9961326718330383,
+      "observed_late_rate": 0.9968546865170895,
+      "count": 4769
     }
   ],
   "top_importances": {
-    "Days for shipment (scheduled)": 0.6574000120162964,
-    "Shipping Mode_First Class": 0.19949999451637268,
-    "Shipping Mode_Second Class": 0.06239999830722809,
-    "Type_TRANSFER": 0.04230000078678131,
-    "Market_USCA": 0.002199999988079071,
-    "Type_DEBIT": 0.002099999925121665,
-    "Customer Segment_Home Office": 0.0019000000320374966,
-    "Department Name_Apparel": 0.0019000000320374966,
-    "Customer Segment_Consumer": 0.0017999999690800905,
-    "Department Name_Fan Shop": 0.0017000000225380063
+    "Days for shipment (scheduled)": 0.5834000110626221,
+    "Shipping Mode_First Class": 0.1559000015258789,
+    "same_day_order_hour": 0.1137000024318695,
+    "Shipping Mode_Second Class": 0.07440000027418137,
+    "Type_TRANSFER": 0.036400001496076584,
+    "Type_DEBIT": 0.002400000113993883,
+    "Market_USCA": 0.002400000113993883,
+    "Customer Segment_Home Office": 0.002099999925121665,
+    "Type_CASH": 0.0020000000949949026,
+    "Customer Segment_Consumer": 0.0017999999690800905
   }
 }

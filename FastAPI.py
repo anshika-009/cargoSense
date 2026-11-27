@@ -5,9 +5,11 @@ rule-based route weather penalty (route_weather.py) and adds it on top.
 Input: order fields, destination (city, optional state or coordinates), optional dispatch date.
 Output: total risk, base risk, weather penalty and its split, weather values, status, availability.
 Notes: if weather cannot be fetched the penalty is 0 and weather_available is False.
+dispatch_hour (0 to 23) feeds the order_hour feature; it defaults to the current hour in India.
 Run: uvicorn FastAPI:app --reload
 """
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -18,6 +20,7 @@ import inference
 import route_weather
 
 app = FastAPI(title="CargoSense API", version="2.0")
+INDIA_TZ = ZoneInfo("Asia/Kolkata")
 MODEL, COLUMNS, DEFAULTS = inference.load_artifacts()
 
 
@@ -35,6 +38,7 @@ class PredictRequest(BaseModel):
     destination_lon: Optional[float] = Field(default=None, ge=-180, le=180)
     origin_hub: str = "Delhi Hub (North HQ)"
     dispatch_date: Optional[date] = Field(default=None, description="Defaults to today")
+    dispatch_hour: Optional[int] = Field(default=None, ge=0, le=23, description="Defaults to the current hour in India")
 
     @model_validator(mode="after")
     def coordinates_come_together(self):
@@ -70,6 +74,7 @@ class PredictResponse(BaseModel):
     weather_arrival_date: date
     weather: WeatherValues
     distance_km: float
+    dispatch_hour: int
     market: str
     status: str
 
@@ -109,8 +114,9 @@ def predict(req: PredictRequest):
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
+    hour = req.dispatch_hour if req.dispatch_hour is not None else datetime.now(INDIA_TZ).hour
     scored = inference.score_order(
-        MODEL, COLUMNS, DEFAULTS, dict(req.model_dump(), market=market),
+        MODEL, COLUMNS, DEFAULTS, dict(req.model_dump(), market=market, dispatch_hour=hour),
         weather_penalty_pct=weather["penalty_mean"],
     )
     split = weather["penalty_split"]
@@ -123,5 +129,6 @@ def predict(req: PredictRequest):
         weather_dispatch_date=weather["dispatch_date"], weather_arrival_date=weather["arrival_date"],
         weather=weather_values(weather),
         distance_km=geo_utils.distance_km(geo_utils.ORIGIN_COORDS, destination),
+        dispatch_hour=hour,
         market=market,
     )
