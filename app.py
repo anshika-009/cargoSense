@@ -22,7 +22,11 @@ if "pending_mode_update" in st.session_state:
 if "pending_days_update" in st.session_state:
     st.session_state["committed_days_input"] = st.session_state.pop("pending_days_update")
 
-# --- HORIZONTAL CARGOSENSE CONSOLE (TOP) ---
+# --- HEADER & BRANDING (TOP) ---
+current_view = st.session_state.get("workspace_view", "Pre-Dispatch Risk Simulator")
+apply_theme_and_header(current_view)
+
+# --- HORIZONTAL CARGOSENSE CONSOLE ---
 state_list = sorted(INDIA_STATES_CITIES.keys())
 
 st.markdown(
@@ -95,14 +99,13 @@ with c_view:
     nav_choice = st.selectbox(
         "Workspace View",
         ["Pre-Dispatch Risk Simulator", "Network Corridor Intelligence"],
+        key="workspace_view",
     )
 with c_run:
     st.write("")
     run_clicked = st.button("Run Risk Assessment", type="primary", use_container_width=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
-
-apply_theme_and_header(nav_choice)
 
 active_hub = (
     get_hub_record(selected_state, selected_city)
