@@ -4,6 +4,7 @@ Purpose: check route sampling, day mapping, averaging and failure handling with 
 """
 import unittest
 from datetime import date, timedelta
+from unittest import mock
 
 import route_weather as rw
 
@@ -109,6 +110,58 @@ class RouteWeatherTests(unittest.TestCase):
         for bad in (0, 2.5):
             with self.assertRaises(ValueError):
                 rw.get_route_weather(DELHI, CHENNAI, bad, None, make_http(), today=TODAY)
+
+
+class CacheAndThrottleTests(unittest.TestCase):
+    def setUp(self):
+        rw.clear_cache()
+        self.calls = []
+        fake = make_http(precip=10.0)
+
+        def requests_get(url, params=None, timeout=None):
+            self.calls.append(url)
+            return fake(url, params, timeout)
+
+        patches = [mock.patch("requests.get", side_effect=requests_get), mock.patch.object(rw, "throttle")]
+        for patch in patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+        self.addCleanup(rw.clear_cache)
+
+    def run_default(self, days=4):
+        return rw.get_route_weather(DELHI, CHENNAI, days, None, rw.default_http_get, today=date.today())
+
+    def test_second_identical_request_makes_no_network_calls(self):
+        first = self.run_default()
+        made = len(self.calls)
+        second = self.run_default()
+        self.assertGreater(made, 0)
+        self.assertEqual(len(self.calls), made)
+        self.assertEqual(first["penalty_mean"], second["penalty_mean"])
+
+    def test_different_window_reuses_route_but_refetches_forecast(self):
+        self.run_default(4)
+        self.calls.clear()
+        self.run_default(5)
+        self.assertEqual([u for u in self.calls if "osrm" in u], [])
+        self.assertTrue(any("open-meteo" in u for u in self.calls))
+
+    def test_forecast_cache_expires(self):
+        self.run_default()
+        self.calls.clear()
+        with mock.patch.object(rw, "FORECAST_CACHE_SECONDS", -1):
+            self.run_default()
+        self.assertTrue(any("open-meteo" in u for u in self.calls))
+
+    def test_failures_are_not_cached(self):
+        with mock.patch("requests.get", side_effect=OSError("down")):
+            self.assertFalse(self.run_default()["available"])
+        self.assertTrue(self.run_default()["available"])
+
+    def test_fake_http_never_touches_cache(self):
+        rw.get_route_weather(DELHI, CHENNAI, 4, None, make_http(), today=TODAY)
+        self.assertEqual(rw._CACHE["routes"], {})
+        self.assertEqual(rw._CACHE["forecasts"], {})
 
 
 if __name__ == "__main__":

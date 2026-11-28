@@ -7,13 +7,18 @@ per-route detail and an availability flag.
 Notes: routes come from OSRM (free, no key); if it fails, a straight geodesic line is used and
 flagged. Points are sampled along each route and the shipment is assumed to move at constant
 speed, so a point at fraction f of the route is reached on day dispatch + f * transit_days.
-Dispatch defaults to today and must fall inside the Open-Meteo forecast window (16 days).
+Dispatch defaults to today and must fall inside the Open-Meteo forecast window (15 days).
 Each point-day goes through compute_weather_penalty(); points are averaged per route, then routes
 are averaged. Raw rain and wind are never averaged, only penalties. Nothing is invented: any
 failed forecast makes available False with a zero penalty.
-Used by: the API (planned) and experiments/compare_weather.py.
+Live requests are throttled (one every MIN_INTERVAL_SECONDS across threads) and cached: route
+geometry for ROUTE_CACHE_SECONDS, forecasts for FORECAST_CACHE_SECONDS. Failures are never cached.
+Caching and throttling apply only to the default HTTP client, so tests with fakes see neither.
+Used by: the API and experiments/compare_weather.py.
 """
 import math
+import threading
+import time
 from datetime import date, timedelta
 
 from weather_penalty import compute_weather_penalty
@@ -30,11 +35,43 @@ MAX_ROUTES = 3
 FORECAST_HORIZON_DAYS = 15
 EARTH_RADIUS_KM = 6371.0088
 FETCH_ERRORS = (OSError, ValueError, KeyError, IndexError, TypeError)
+MIN_INTERVAL_SECONDS = 0.25
+ROUTE_CACHE_SECONDS = 24 * 3600
+FORECAST_CACHE_SECONDS = 3600
+
+_THROTTLE_LOCK = threading.Lock()
+_LAST_REQUEST = [0.0]
+_CACHE = {"routes": {}, "forecasts": {}}
+
+
+def clear_cache():
+    for store in _CACHE.values():
+        store.clear()
+
+
+def cache_get(name, key, ttl_seconds):
+    entry = _CACHE[name].get(key)
+    if entry is None or time.time() - entry[0] > ttl_seconds:
+        return None
+    return entry[1]
+
+
+def cache_put(name, key, value):
+    _CACHE[name][key] = (time.time(), value)
+
+
+def throttle():
+    with _THROTTLE_LOCK:
+        wait = MIN_INTERVAL_SECONDS - (time.monotonic() - _LAST_REQUEST[0])
+        if wait > 0:
+            time.sleep(wait)
+        _LAST_REQUEST[0] = time.monotonic()
 
 
 def default_http_get(url, params, timeout):
     import requests
 
+    throttle()
     return requests.get(url, params=params, timeout=timeout)
 
 
@@ -54,6 +91,12 @@ def straight_line(origin, destination, steps=40):
 
 def fetch_routes(origin, destination, http_get=default_http_get):
     """Returns (routes, source). Each route is a list of (lat, lon)."""
+    use_cache = http_get is default_http_get
+    key = (round(origin[0], 3), round(origin[1], 3), round(destination[0], 3), round(destination[1], 3))
+    if use_cache:
+        cached = cache_get("routes", key, ROUTE_CACHE_SECONDS)
+        if cached is not None:
+            return cached, "osrm"
     url = OSRM_URL.format(lon1=origin[1], lat1=origin[0], lon2=destination[1], lat2=destination[0])
     params = {"alternatives": "true", "overview": "simplified", "geometries": "geojson"}
     try:
@@ -63,7 +106,10 @@ def fetch_routes(origin, destination, http_get=default_http_get):
         routes = [[(lat, lon) for lon, lat in r["geometry"]["coordinates"]] for r in payload["routes"]]
         if not routes:
             raise ValueError("no routes")
-        return routes[:MAX_ROUTES], "osrm"
+        routes = routes[:MAX_ROUTES]
+        if use_cache:
+            cache_put("routes", key, routes)
+        return routes, "osrm"
     except FETCH_ERRORS:
         return [straight_line(origin, destination)], "geodesic"
 
@@ -92,6 +138,12 @@ def day_for_fraction(fraction, transit_days, dispatch):
 
 def fetch_point_forecasts(points, start, end, http_get=default_http_get):
     """One request for all points. Returns a list of daily dicts, one per point."""
+    use_cache = http_get is default_http_get
+    key = (tuple((round(p[0], 3), round(p[1], 3)) for p in points), start, end)
+    if use_cache:
+        cached = cache_get("forecasts", key, FORECAST_CACHE_SECONDS)
+        if cached is not None:
+            return cached
     params = {
         "latitude": ",".join(str(round(p[0], 3)) for p in points),
         "longitude": ",".join(str(round(p[1], 3)) for p in points),
@@ -106,7 +158,10 @@ def fetch_point_forecasts(points, start, end, http_get=default_http_get):
     payload = payload if isinstance(payload, list) else [payload]
     if len(payload) != len(points):
         raise ValueError("forecast count does not match points")
-    return [item["daily"] for item in payload]
+    daily = [item["daily"] for item in payload]
+    if use_cache:
+        cache_put("forecasts", key, daily)
+    return daily
 
 
 def point_penalty(daily, day):

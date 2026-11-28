@@ -179,4 +179,7 @@ else:
         scored_pred=prediction,
         qty=order_quantity,
         sales=sales_per_customer,
+        shipping_mode=shipping_mode,
+        price=product_price,
+        dispatch_date=dispatch_date,
     )

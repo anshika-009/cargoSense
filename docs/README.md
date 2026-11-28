@@ -15,6 +15,7 @@ An XGBoost model trained on the DataCo Smart Supply Chain dataset is served thro
 - **Geospatial mapping:** the API geocodes the destination with Geopy (Nominatim) when coordinates are not sent, computes geodesic distance from the Delhi HQ hub, and maps the country to the model's `Market` value. `Market` is backend-only and never shown; every Indian destination maps to Pacific Asia.
 - **Physical feasibility checks:** zero-day transit is rejected in both the UI and the API, as are dispatch dates in the past and arrivals beyond the forecast range.
 - **Weather unavailable state:** if a forecast cannot be fetched, the penalty is 0, `weather_available` is `false` and the dashboard says so. No weather values are invented, and there is no offline fallback.
+- **Network scan:** the Network Corridor Intelligence page has a "Run Network Scan" button that scores every hub through `POST /predict/batch`, each with its own route weather, route penalty and model score. Without a scan, hubs other than the live route use a weather-free estimate.
 - **Operational dashboard:** two pages, a Pre-Dispatch Risk Simulator with a 3D route map, and Network Corridor Intelligence with the model's real test metrics. Status badges: `STABLE OPTIMAL ROUTE`, `MODERATE CAUTION ZONE`, `CRITICAL SLA RISK`.
 
 ## How It Works
@@ -156,6 +157,26 @@ Response (shortened):
 ```
 
 The API computes the weather penalty itself. A client-supplied `weather_delay_penalty_pct` or `market` is ignored. `weather_source` is `osrm`, or `geodesic` when routing failed and a straight line was used. The values above are illustrative.
+
+### Network scan: `POST /predict/batch`
+
+Scores many destinations in one call, each through the same pipeline as `/predict` (route weather, route penalty, model). Shipment fields are sent once; each hub needs `city`, `lat` and `lon` (and optionally `state`). Up to 60 hubs per call.
+
+```json
+{
+  "order_quantity": 1, "sales_per_customer": 50, "product_price": 10,
+  "shipping_mode": "Standard Class",
+  "scheduled_shipping_days": 4,
+  "dispatch_date": "2026-11-28",
+  "hubs": [{"city": "Chennai", "state": "Tamil Nadu", "lat": 13.0827, "lon": 80.2707}]
+}
+```
+
+`scheduled_shipping_days` is optional. If sent, it is the common window for every hub (shows which corridors break at that promise). If omitted, each hub gets its own `recommended_days` (the days a truck at 450 km/day needs, plus one buffer day).
+
+The response has `as_of`, `dispatch_date`, `common_window`, `count`, `failed` and `items`. Each item has `city`, `state`, `ok`, `error`, `recommended_days`, `scheduled_shipping_days`, `days_capped` (true when the recommendation did not fit the forecast range) and `result`, which has the same fields as a `/predict` response. A hub whose forecast failed still returns a `result` with `weather_available: false` and a zero weather penalty. A hub that cannot be scored returns `ok: false`, an `error` and no `result`. A past dispatch date or an invalid common window rejects the whole call with HTTP 422.
+
+Outbound requests are throttled to one every 0.25 s and cached in memory: route geometry for 24 hours, forecasts for 1 hour. `as_of` tells the client how fresh the scan is.
 
 Invalid input returns HTTP 422. Interactive docs are available at `http://localhost:8000/docs` while the API is running.
 
