@@ -7,6 +7,8 @@ from route_weather import FORECAST_HORIZON_DAYS
 from states_cities import ORIGIN_HUB
 
 API_URL = os.environ.get("CARGOSENSE_API", "http://127.0.0.1:8000")
+SCAN_CHUNK = 6
+SCAN_TIMEOUT_SECONDS = 120
 
 
 def validate_inputs(order_quantity, scheduled_shipping_days, sales_per_customer, product_price, dispatch_date):
@@ -105,3 +107,51 @@ def run_and_store_assessment(hub_rec, qty, sales, price, mode, days, dispatch):
         "result": pred_result,
         "what_if": what_if_result,
     }
+
+
+def scan_key(qty, sales, price, mode, days, dispatch):
+    return (int(qty), float(sales), float(price), mode, days, dispatch.isoformat())
+
+
+def post_batch(payload):
+    try:
+        response = requests.post(f"{API_URL}/predict/batch", json=payload, timeout=SCAN_TIMEOUT_SECONDS)
+    except requests.RequestException:
+        return None, "The prediction service is not reachable. Start it with: uvicorn FastAPI:app --reload"
+    if not response.ok:
+        return None, describe_api_error(response)
+    return response.json(), None
+
+
+def run_network_scan(hub_records, qty, sales, price, mode, days, dispatch, progress=None):
+    """Score every hub through POST /predict/batch in small chunks. days=None uses each hub's recommended days."""
+    errors = validate_inputs(qty, days or 1, sales, price, dispatch)
+    if errors:
+        return None, " ".join(errors)
+    shared = {
+        "order_quantity": int(qty),
+        "sales_per_customer": float(sales),
+        "product_price": float(price),
+        "shipping_mode": mode,
+        "origin_hub": ORIGIN_HUB,
+        "dispatch_date": dispatch.isoformat(),
+    }
+    if days is not None:
+        shared["scheduled_shipping_days"] = int(days)
+    items, as_of = {}, None
+    for start in range(0, len(hub_records), SCAN_CHUNK):
+        chunk = hub_records[start:start + SCAN_CHUNK]
+        hubs = [{"city": r["city"], "state": r["state"], "lat": r["coords"][1], "lon": r["coords"][0]} for r in chunk]
+        data, error = post_batch(dict(shared, hubs=hubs))
+        if error:
+            return None, error
+        as_of = data["as_of"]
+        items.update({(i["state"], i["city"]): i for i in data["items"]})
+        if progress:
+            progress(min(start + len(chunk), len(hub_records)) / len(hub_records))
+    return {
+        "key": scan_key(qty, sales, price, mode, days, dispatch),
+        "as_of": as_of,
+        "items": items,
+        "failed": sum(1 for i in items.values() if not i["ok"]),
+    }, None

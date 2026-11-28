@@ -175,6 +175,8 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28: CONTRACT ADDITION. New `POST /predict/batch` for the network scan: shared shipment fields plus a list of hubs (`city`, `state`, `lat`, `lon`), optional common `scheduled_shipping_days` (otherwise each hub gets `route_penalty.recommended_days()`), returns one `/predict`-shaped result per hub with `ok`, `error`, `days_capped` and an `as_of` time. `/predict` is unchanged; both share `run_prediction()`. `route_weather.py` now throttles live requests (0.25 s apart) and caches route geometry (24 h) and forecasts (1 h); failures are never cached and fakes bypass both. Reason: the corridor table scored every non-live hub with one fixed base risk and no weather, so all hubs looked alike.
+
 - 2026-11-28 (`fix/model-days`, anshika-009): CONTRACT ADDITION. `POST /predict` now returns `model_scheduled_days` (`inference.py`, `FastAPI.py`).
 
 - 2026-11-27: CONTRACT ADDITION. Added optional request field `dispatch_hour` (0 to 23, default the current hour in India) and response field `dispatch_hour`. It feeds the same-day order hour feature; other modes ignore it. Older clients keep working.
@@ -206,6 +208,8 @@ A record of what we built, why, and what we rejected, organised by feature. With
 **Removed from the UI:** placeholder KPIs, "LIVE RADAR" label, duplicate weather labels, speed requirement, market and region chips, sidebar Facts panel, the non-functional "Authorize Dispatch Exception" button, emojis.
 
 **Log:**
+
+- 2026-11-28: Network Corridor Intelligence gets a "Run Network Scan" button (`corridor.py`, `api_client.py`). It posts hubs to `/predict/batch` in chunks of 6 with a progress bar, either with the console window or each hub's recommended days. The table gains Window and Weather columns, an "as of" note and a stale-scan caption when inputs change. Hubs whose forecast failed show "unavailable". 93 tests.
 
 - 2026-11-23: Page 1 now uses the API for weather. Added a dispatch date picker; the request sends `dispatch_date`, destination coordinates and state. The summary card shows the penalty split, weather window, worst segment, route averages and arrival date from the response, and a "weather unavailable" warning when `weather_available` is false. Removed the dashboard's own live weather fetch and the static offline fallback (including the invented +1 day relief); if the API is down or rejects the order the dashboard shows the error and stores nothing. Removed the per-hub advisory text from the card.
 - 2026-11-27: Added a Dispatch Time input (hourly) that is sent as `dispatch_hour`. Page 2 metrics card now shows each metric with its value before the order-hour feature ("was 69.4% before"), an Accuracy tile, and an Accuracy by shipping mode table showing before and after, so it is clear the gain is Same Day orders only.
@@ -267,7 +271,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 ## 9. Testing
 
-**Status:** weather, geocoding, API contract and the order-hour feature covered.
+**Status:** weather, geocoding, API contract (single and batch), caching and the order-hour feature covered.
 
 **What:** 65 passing tests in `tests/`: 22 for `weather_penalty.py` (band boundaries, probability scaling, cap, monotonic growth, validation), 10 for `weather_utils.py` (parsing, wrong date, failure, caching, invalid days), 13 for `route_weather.py` (sampling, day mapping, averaging, failure, dispatch date), 5 for `geo_utils.py`, 10 for the `/predict` contract (real model, faked weather and geocoding) and 5 for the order-hour feature (derived only for Same Day, learned cut-off, no leakage columns). All use fake responses, so no network is needed. Run from the repo root: `python -m unittest discover -s tests -t . -v`.
 
@@ -277,6 +281,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28: 87 tests. Added `/predict/batch` (8), cache and throttle (5) and `recommended_days` (2) tests.
 - 2026-11-28 (`fix/model-days`, anshika-009): Added `tests/test_model_days.py` for model scheduled-day routing vs. transit window.
 
 - 2026-11-23: Tests moved into `tests/` with `tests/__init__.py`. App modules stay in the repo root.

@@ -33,6 +33,17 @@ class RoutePenaltyTests(unittest.TestCase):
     def test_cap(self):
         self.assertLessEqual(rp.compute_route_penalty(5000, 1, "Ladakh")["total"], rp.MAX_ROUTE_PENALTY)
 
+    def test_recommended_days_grow_with_distance_and_keep_penalty_low(self):
+        near, far = rp.recommended_days(280), rp.recommended_days(2234)
+        self.assertEqual(near, 2)
+        self.assertGreater(far, near)
+        for km in (280, 1150, 1760, 2234):
+            self.assertLess(rp.compute_route_penalty(km, rp.recommended_days(km), "Plains")["slack"], 8.0)
+
+    def test_recommended_days_validation(self):
+        with self.assertRaises(ValueError):
+            rp.recommended_days(-1)
+
     def test_validation(self):
         with self.assertRaises(ValueError):
             rp.compute_route_penalty(-1, 3)

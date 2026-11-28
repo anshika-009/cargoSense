@@ -8,8 +8,11 @@ Output: dict with slack, terrain and total points, plus the required km per day.
 Notes: slack compares the speed the promise needs (geodesic km x ROAD_FACTOR / days) with a
 realistic road speed (KM_PER_DAY). Terrain points are scaled down for short hops. All constants
 are team-chosen heuristics, not learned or validated. Tune only the constants below.
+recommended_days() gives the window a corridor needs: the days a truck at KM_PER_DAY needs, plus
+one buffer day for hub handling. The network scan uses it when no common window is requested.
 Used by: the API, added on top of the model's base risk and the weather penalty.
 """
+import math
 
 KM_PER_DAY = 450.0
 ROAD_FACTOR = 1.25
@@ -48,6 +51,12 @@ def interpolate(value, points):
 
 def required_km_per_day(distance_km, days):
     return distance_km * ROAD_FACTOR / days
+
+
+def recommended_days(distance_km):
+    if distance_km is None or distance_km < 0:
+        raise ValueError("distance_km must be zero or more")
+    return math.ceil(required_km_per_day(distance_km, 1) / KM_PER_DAY) + 1
 
 
 def compute_route_penalty(distance_km, days, state=None):
