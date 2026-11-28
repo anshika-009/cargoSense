@@ -3,12 +3,12 @@
 from datetime import date, timedelta
 import streamlit as st
 
-from api_client import build_payload, run_and_store_assessment
-from corridor import render_corridor_intelligence, render_model_sidebar
-from route_weather import FORECAST_HORIZON_DAYS
-from simulator_view import render_simulator_page
-from states_cities import INDIA_STATES_CITIES, ORIGIN_HUB, get_hub_record
-from theme import apply_theme_and_header
+from dashboard.api_client import build_payload, run_and_store_assessment
+from dashboard.corridor import render_corridor_intelligence, render_model_sidebar
+from core.route_weather import FORECAST_HORIZON_DAYS
+from dashboard.simulator_view import render_simulator_page
+from core.states_cities import INDIA_STATES_CITIES, ORIGIN_HUB, get_hub_record
+from dashboard.theme import apply_theme_and_header
 
 st.set_page_config(
     page_title="CargoSense — 3D Telemetry & Route Analysis",

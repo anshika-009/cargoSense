@@ -6,7 +6,7 @@ Order Id, because the provided files share Order Ids (items of one order sit in 
 Output: models/final_xgb_model.pkl, processed_data_pipeline.pkl, defaults.json, metrics.json.
 Notes: baseline_without_order_hour is a second XGBoost trained the same way without the same-day
 order hour feature, so metrics.json always shows the before and after of that change on the same split.
-Run: python model_training.py        (add --cv for 5-fold grouped cross-validation)
+Run: python -m ml.model_training        (add --cv for 5-fold grouped cross-validation)
 """
 import json
 import sys
@@ -30,9 +30,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-import feature_data as fd
+from ml import feature_data as fd
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"
 TRAIN_PATH = DATA_DIR / "train.csv"

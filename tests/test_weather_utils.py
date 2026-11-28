@@ -6,7 +6,7 @@ Run: python -m unittest discover -s tests -t . -v
 import unittest
 from datetime import date
 
-import weather_utils
+from core import weather_utils
 
 TODAY = date(2026, 11, 22)
 ARRIVAL = "2026-11-25"

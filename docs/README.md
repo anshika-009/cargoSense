@@ -45,22 +45,33 @@ Streamlit input -> POST /predict -> Pydantic validation
 ## Project Structure
 
 ```
-data/                 train.csv, test.csv (DataCo, not in the repo)
-models/               final_xgb_model.pkl, processed_data_pipeline.pkl, defaults.json, metrics.json, experiments.json
+app.py                Streamlit dashboard (entry point)
+api/
+  main.py             prediction API: /predict, /predict/batch, /health
+core/                 rules and lookups, no web code
+  geo_utils.py        geocoding, geodesic distance, Market mapping
+  route_penalty.py    distance and terrain penalty, recommended days
+  route_weather.py    route-based weather penalty (throttle and cache)
+  weather_utils.py    single-point arrival-day forecast
+  weather_penalty.py  rain, wind and heat rules
+  states_cities.py    destination cities and coordinates
+dashboard/            Streamlit screens
+  api_client.py       calls to the API, network scan client
+  corridor.py         Network Corridor Intelligence page
+  simulator_view.py   Pre-Dispatch Risk Simulator page
+  map.py              3D route map
+  theme.py            colours, CSS, header
+ml/                   model code
+  feature_data.py     feature selection and encoding
+  inference.py        model loading, scoring, status thresholds
+  model_training.py   training and evaluation
+  EDA.py              exploratory analysis
+  experiments/        accuracy experiments, weather diagnostics
+models/               model files, defaults.json, metrics.json, experiments.json
+reports/              eda_output.txt, training_output.txt
 tests/                unit and API tests (no network needed)
-experiments/          improve_model.py (accuracy experiments)
+data/                 train.csv, test.csv (DataCo, not in the repo)
 docs/                 README.md, DEVLOG.md
-FastAPI.py            prediction API
-inference.py          model loading, scoring, status thresholds
-geo_utils.py          geocoding, geodesic distance, Market mapping
-route_weather.py      route-based weather penalty
-weather_utils.py      single-point arrival-day forecast
-weather_penalty.py    rain, wind and heat rules
-states_cities.py      destination cities and coordinates for the dashboard
-app.py                Streamlit dashboard
-EDA.py                exploratory analysis
-feature_data.py       feature selection and encoding
-model_training.py     training and evaluation
 requirements.txt
 ```
 
@@ -77,20 +88,20 @@ pip install -r requirements.txt
 Run the API and the dashboard in two separate terminals, API first:
 
 ```bash
-uvicorn FastAPI:app --reload
+uvicorn api.main:app --reload
 streamlit run app.py
 ```
 
 To retrain the model (needs `data/train.csv` and `data/test.csv`; `--cv` adds 5-fold grouped cross-validation):
 
 ```bash
-python model_training.py --cv
+python -m ml.model_training --cv
 ```
 
 To repeat the accuracy experiments:
 
 ```bash
-python -m experiments.improve_model
+python -m ml.experiments.improve_model
 ```
 
 To run the tests (they use fake responses, so no internet is needed; the API tests need `httpx`):
@@ -214,7 +225,7 @@ The whole improvement is Same Day orders. For the other three modes the model al
 
 ### Experiments
 
-Each change was tested alone against the baseline with `python -m experiments.improve_model` (same split; results saved to `models/experiments.json`):
+Each change was tested alone against the baseline with `python -m ml.experiments.improve_model` (same split; results saved to `models/experiments.json`):
 
 | Change                                           | Test ROC-AUC | Test accuracy | Kept          |
 | ------------------------------------------------ | ------------ | ------------- | ------------- |

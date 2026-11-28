@@ -17,11 +17,11 @@ import json
 from pathlib import Path
 import streamlit as st
 
-import route_penalty
+from core import route_penalty
 
-from states_cities import ORIGIN_HUB, get_all_city_records
-from api_client import run_network_scan, scan_key
-from theme import (
+from core.states_cities import ORIGIN_HUB, get_all_city_records
+from dashboard.api_client import run_network_scan, scan_key
+from dashboard.theme import (
     ACCENT,
     CRIT_TEXT,
     STATUS_COLORS,
@@ -32,9 +32,9 @@ from theme import (
     metric_tile,
     status_from_risk,
 )
-from weather_utils import condition_label
+from core.weather_utils import condition_label
 
-METRICS_FILE = Path(__file__).parent / "models" / "metrics.json"
+METRICS_FILE = Path(__file__).resolve().parent.parent / "models" / "metrics.json"
 SLA_PENALTY_RATE = 0.20
 EXPEDITE_COST_USD = 45.0
 

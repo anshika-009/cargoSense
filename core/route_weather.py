@@ -21,7 +21,7 @@ import threading
 import time
 from datetime import date, timedelta
 
-from weather_penalty import compute_weather_penalty
+from core.weather_penalty import compute_weather_penalty
 
 OSRM_URL = "https://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"

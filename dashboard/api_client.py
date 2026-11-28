@@ -3,8 +3,8 @@ from datetime import date, timedelta
 import requests
 import streamlit as st
 
-from route_weather import FORECAST_HORIZON_DAYS
-from states_cities import ORIGIN_HUB
+from core.route_weather import FORECAST_HORIZON_DAYS
+from core.states_cities import ORIGIN_HUB
 
 API_URL = os.environ.get("CARGOSENSE_API", "http://127.0.0.1:8000")
 SCAN_CHUNK = 6
@@ -61,7 +61,7 @@ def get_prediction(payload):
     try:
         response = requests.post(f"{API_URL}/predict", json=payload, timeout=30)
     except requests.RequestException:
-        return None, "The prediction service is not reachable. Start it with: uvicorn FastAPI:app --reload"
+        return None, "The prediction service is not reachable. Start it with: uvicorn api.main:app --reload"
     if not response.ok:
         return None, describe_api_error(response)
     return response.json(), None
@@ -117,7 +117,7 @@ def post_batch(payload):
     try:
         response = requests.post(f"{API_URL}/predict/batch", json=payload, timeout=SCAN_TIMEOUT_SECONDS)
     except requests.RequestException:
-        return None, "The prediction service is not reachable. Start it with: uvicorn FastAPI:app --reload"
+        return None, "The prediction service is not reachable. Start it with: uvicorn api.main:app --reload"
     if not response.ok:
         return None, describe_api_error(response)
     return response.json(), None

@@ -10,10 +10,10 @@ from unittest import mock
 from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
-import FastAPI as api
-import api_client
-import route_weather
-from states_cities import get_all_city_records
+from api import main as api
+from dashboard import api_client
+from core import route_weather
+from core.states_cities import get_all_city_records
 from tests.test_api import fake_weather
 
 API = TestClient(api.app)

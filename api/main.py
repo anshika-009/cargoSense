@@ -1,5 +1,5 @@
 """
-CargoSense | FastAPI.py
+CargoSense | api/main.py
 Purpose: serve POST /predict. The XGBoost model gives the base risk; the server computes a
 rule-based route weather penalty (route_weather.py) and adds it on top.
 Input: order fields, destination (city, optional state or coordinates), optional dispatch date.
@@ -12,7 +12,7 @@ POST /predict/batch scores many destinations in one call (the network scan). Shi
 each hub is scored with the same pipeline as /predict. scheduled_shipping_days is optional there: when it is
 sent it is the common window for every hub, otherwise each hub gets route_penalty.recommended_days().
 Hubs are processed by a few worker threads; outbound requests are throttled and cached in route_weather.
-Run: uvicorn FastAPI:app --reload
+Run: uvicorn api.main:app --reload
 """
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
@@ -22,10 +22,10 @@ from typing import List, Literal, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
-import geo_utils
-import inference
-import route_penalty
-import route_weather
+from core import geo_utils
+from ml import inference
+from core import route_penalty
+from core import route_weather
 
 app = FastAPI(title="CargoSense API", version="2.0")
 INDIA_TZ = ZoneInfo("Asia/Kolkata")

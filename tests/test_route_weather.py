@@ -6,7 +6,7 @@ import unittest
 from datetime import date, timedelta
 from unittest import mock
 
-import route_weather as rw
+from core import route_weather as rw
 
 TODAY = date(2026, 11, 23)
 DELHI = (28.7041, 77.1025)

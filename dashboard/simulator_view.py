@@ -2,10 +2,10 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import streamlit as st
 
-from api_client import run_and_store_assessment
-from map import build_clean_map_deck
-from states_cities import ORIGIN_HUB, get_all_city_records
-from theme import (
+from dashboard.api_client import run_and_store_assessment
+from dashboard.map import build_clean_map_deck
+from core.states_cities import ORIGIN_HUB, get_all_city_records
+from dashboard.theme import (
     ACCENT,
     ACCENT_SOFT,
     CRIT_TEXT,
@@ -21,7 +21,7 @@ from theme import (
     show_val,
     status_from_risk,
 )
-from weather_utils import condition_label
+from core.weather_utils import condition_label
 
 
 def render_shipment_summary_card(

@@ -11,7 +11,7 @@ Used by: the API, before the penalty is added to the model's base risk.
 import time
 from datetime import date, timedelta
 
-from weather_penalty import compute_weather_penalty
+from core.weather_penalty import compute_weather_penalty
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 DAILY_FIELDS = "precipitation_sum,precipitation_probability_max,wind_speed_10m_max,temperature_2m_max"

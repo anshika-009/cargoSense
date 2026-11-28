@@ -4,7 +4,7 @@ Purpose: check the distance/slack and terrain penalty rules.
 """
 import unittest
 
-import route_penalty as rp
+from core import route_penalty as rp
 
 
 class RoutePenaltyTests(unittest.TestCase):

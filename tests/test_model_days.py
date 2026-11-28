@@ -4,7 +4,7 @@ Purpose: check the model only sees scheduled days it was trained on, so the tran
 """
 import unittest
 
-import inference
+from ml import inference
 
 ORDER = {
     "sales_per_customer": 50, "order_quantity": 1, "product_price": 10,

@@ -4,13 +4,13 @@ Purpose: inspect the separate DataCo train and test files before feature selecti
 Input: TRAIN_PATH and TEST_PATH (edit the two constants below to match your file names).
 Output: printed summary per file, plus train versus test checks (columns, order overlap,
 unseen categories, target balance) and leakage candidates.
-Run: python EDA.py > eda_output.txt
+Run: python -m ml.EDA > reports/eda_output.txt
 """
 from pathlib import Path
 
 import pandas as pd
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TRAIN_PATH = DATA_DIR / "train.csv"
 TEST_PATH = DATA_DIR / "test.csv"
 TARGET = "Late_delivery_risk"
