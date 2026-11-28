@@ -6,6 +6,8 @@ Input: order fields, destination (city, optional state or coordinates), optional
 Output: total risk, base risk, weather penalty and its split, route (slack and terrain) penalty, weather values, status, availability.
 Notes: if weather cannot be fetched the penalty is 0 and weather_available is False.
 dispatch_hour (0 to 23) feeds the order_hour feature; it defaults to the current hour in India.
+The model sees the shipping mode's trained scheduled days (model_scheduled_days); scheduled_shipping_days
+drives the weather window and the route penalty.
 Run: uvicorn FastAPI:app --reload
 """
 from datetime import date, datetime
@@ -63,6 +65,7 @@ class PredictResponse(BaseModel):
     late_delivery_risk_prob: float
     late_delivery_risk_pred: int
     base_risk_pct: float
+    model_scheduled_days: int
     weather_delay_penalty_pct: float
     weather_rain_pct: float
     weather_wind_pct: float

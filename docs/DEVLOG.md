@@ -83,6 +83,8 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28 (`fix/model-days`, anshika-009): Decoupled model scoring days from user transit window. Model now receives each shipping mode's trained scheduled days (`Same Day: 0`, `First: 1`, `Second: 2`, `Standard: 4`), while user transit window drives weather timing and route penalty only. Avoids scoring unseen `day/mode` pairs (e.g., `Standard Class` at 3 days) that inflated base risk.
+
 - 2026-11-21: Added `feature_data.py`, `model_training.py` and the model files. Test results (threshold 0.5): ROC-AUC 0.7426, accuracy 0.6940, F1 0.6578, precision 0.8500, recall 0.5365.
 
 - 2026-11-27: ACCURACY WORK. Added the same-day order hour feature (the hour of the order, used only for Same Day orders; -1 for other modes). Test ROC-AUC 0.7426 to 0.7718, accuracy 69.4% to 71.7%, F1 0.6578 to 0.6910, precision 0.8500 to 0.8607, recall 0.5365 to 0.5773. Train AUC 0.7813, validation 0.7705; 5-fold grouped CV ROC-AUC 0.7719 (std 0.0010), accuracy 71.9% (std 0.0022).
@@ -92,7 +94,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 - 2026-11-27: A logistic regression with the new feature also reaches 0.7712 ROC-AUC, confirming that the information in the data, not the model type, is the limit. Cancelled and suspected-fraud orders always have late rate 0 (label noise); dropping them from training did not help, so they stay.
 - 2026-11-27: Caveats. The inter-state dashboard rejects zero-day transit and Same Day has 0 scheduled days in the data, so the gain does not show up in what the dashboard can score. Each mode has exactly one scheduled day count in the data, so other combinations the slider allows are extrapolations. Training reads the order date column; serving sends `dispatch_hour`.
 
-**Open:** run `python -m experiments.improve_model` and `python model_training.py --cv` after any data change; choose the dashboard classification threshold (recall is 0.5773 at 0.5; the validation sweep is in `metrics.json`); decide whether to remove or relabel Same Day for inter-state use, since it cannot be scored there; pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
+**Open:** run `python -m experiments.improve_model` and `python model_training.py --cv` after any data change; run tests against the real model; choose the dashboard classification threshold (recall is 0.5773 at 0.5; the validation sweep is in `metrics.json`); decide whether to remove or relabel Same Day for inter-state use, since it cannot be scored there; update README note on trained days; pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
 
 ---
 
@@ -173,6 +175,8 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28 (`fix/model-days`, anshika-009): CONTRACT ADDITION. `POST /predict` now returns `model_scheduled_days` (`inference.py`, `FastAPI.py`).
+
 - 2026-11-27: CONTRACT ADDITION. Added optional request field `dispatch_hour` (0 to 23, default the current hour in India) and response field `dispatch_hour`. It feeds the same-day order hour feature; other modes ignore it. Older clients keep working.
 - 2026-11-23: CONTRACT CHANGE (v2.0). The API now computes the weather penalty. The request field `weather_delay_penalty_pct` is no longer used (a client that still sends it is ignored) and `market` is derived from the geocoded country. Added optional request fields `destination_state`, `destination_lat`, `destination_lon` (sent together; if missing the city is geocoded) and `dispatch_date` (default today; past dates and arrivals beyond 15 days are rejected), and `scheduled_shipping_days` now has an upper limit of 15. Added response fields `weather_rain_pct`, `weather_wind_pct`, `weather_heat_pct`, `weather_worst_penalty_pct`, `weather_available`, `weather_reason`, `weather_source`, `weather_dispatch_date`, `weather_arrival_date`, `weather` (averages and worst point), `distance_km` and `market`. Existing response fields keep their names and units, so the current dashboard keeps working.
 - 2026-11-21: API and `inference.py` in the repo (logged retroactively). The dashboard posts to it at `CARGOSENSE_API` (default `http://127.0.0.1:8000`, 8 second timeout) and falls back to the static hub table if it is unreachable, tagging results `model` or `fallback`.
@@ -209,7 +213,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 - 2026-11-23: Prepared an updated `app.py`: consolidated summary card, title no longer hidden under the header (top padding 2.2rem to 4.5rem), emojis and clutter removed, solid accent on the Run button ("Run risk assessment"). Not yet confirmed applied to the repo.
 - 2026-11-21: Replaced CSV input with the single-order flow (`validate_inputs`, `get_prediction`, session-state results), added `status_from_risk` and `get_arrival_weather`, removed fake metrics. Results are tied to the exact payload, so an input change needs a re-run. The Run button sits above the sidebar panels.
 
-**Open:** confirm the update was applied against the latest local `app.py`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`, cache or localise the state borders).
+**Open:** add caption near the transit window slider; confirm the update was applied against the latest local `app.py`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`, cache or localise the state borders).
 
 ---
 
@@ -272,6 +276,8 @@ A record of what we built, why, and what we rejected, organised by feature. With
 **Alternatives considered:** pytest was not used, to avoid a new dependency; `unittest` is in the standard library.
 
 **Log:**
+
+- 2026-11-28 (`fix/model-days`, anshika-009): Added `tests/test_model_days.py` for model scheduled-day routing vs. transit window.
 
 - 2026-11-23: Tests moved into `tests/` with `tests/__init__.py`. App modules stay in the repo root.
 
