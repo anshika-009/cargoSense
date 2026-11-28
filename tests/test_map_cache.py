@@ -22,6 +22,22 @@ class GeojsonTests(unittest.TestCase):
         self.assertEqual(ring, [[77.12, 28.99], [78.5, 29.5], [77.12, 28.99]])
 
 
+class CompactTests(unittest.TestCase):
+    def test_thinning_keeps_rings_closed_and_drops_dense_points(self):
+        dense = [[77.0 + i * 0.001, 28.0] for i in range(200)] + [[77.0, 28.0]]
+        raw = {"features": [{"geometry": {"type": "Polygon", "coordinates": [dense]}}]}
+        ring = simplify_geojson(raw)["features"][0]["geometry"]["coordinates"][0]
+        self.assertLess(len(ring), 30)
+        self.assertEqual(ring[0], ring[-1])
+
+    def test_deck_json_is_compact_and_built_once(self):
+        rec = get_all_city_records()[0]
+        deck = map_module.cached_map_deck(rec["state"], rec["city"], STATUS_STABLE, False, False)
+        text = deck.to_json()
+        self.assertNotIn("\n", text)
+        self.assertIs(text, deck.to_json())
+
+
 class DeckCacheTests(unittest.TestCase):
     def test_same_inputs_reuse_the_same_deck(self):
         rec = get_all_city_records()[0]

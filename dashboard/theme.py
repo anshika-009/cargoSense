@@ -219,17 +219,32 @@ def metric_tile(label: str, value_html: str, sub_html: str, accent_color: str) -
 
 
 GEOJSON_URL = "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson"
-GEOJSON_DISK_CACHE = Path(__file__).resolve().parent.parent / "data" / "india_states_light.json"
+GEOJSON_DISK_CACHE = Path(__file__).resolve().parent.parent / "data" / "india_states_v2.json"
 GEOJSON_RETRY_SECONDS = 300
 
 
+THIN_DEGREES = 0.03  # about 3 km; one screen pixel at the map's zoom is about 4 km
+
+
+def _thin_ring(ring):
+    """Drop points closer than THIN_DEGREES to the last kept one. Keep the first and last so the ring stays closed."""
+    kept = [ring[0]]
+    for pt in ring[1:-1]:
+        if abs(pt[0] - kept[-1][0]) >= THIN_DEGREES or abs(pt[1] - kept[-1][1]) >= THIN_DEGREES:
+            kept.append(pt)
+    kept.append(ring[-1])
+    return kept if len(kept) >= 4 else ring
+
+
 def _round_coords(node, digits=2):
-    """Round every coordinate (about 1 km at 2 digits) and drop repeated points to shrink the payload."""
+    """Round every coordinate (about 1 km at 2 digits), drop repeats, and thin dense rings to shrink the payload."""
     if node and isinstance(node[0], (int, float)):
         return [round(node[0], digits), round(node[1], digits)]
     out = [_round_coords(child, digits) for child in node]
     if out and isinstance(out[0][0], (int, float)):
         out = [pt for i, pt in enumerate(out) if i == 0 or pt != out[i - 1]]
+        if len(out) > 4:
+            out = _thin_ring(out)
     return out
 
 

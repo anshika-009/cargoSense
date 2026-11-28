@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
@@ -53,6 +55,18 @@ CRITICAL_WARN_PIN_URI = svg_to_data_uri(
     '<circle cx="29" cy="32.3" r="1.5" fill="#be123c"/>'
     "</svg>"
 )
+
+
+class CompactDeck(pdk.Deck):
+    """pydeck pretty-prints its JSON, which is about 6 times larger than the data. Streamlit sends whatever
+    to_json() returns on every rerun, so send it compact and build the string only once."""
+
+    _compact = None
+
+    def to_json(self, *args, **kwargs):
+        if self._compact is None:
+            self._compact = json.dumps(json.loads(super().to_json(*args, **kwargs)), separators=(",", ":"))
+        return self._compact
 
 
 def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_scored=False):
@@ -243,7 +257,7 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
         bearing=0,
     )
 
-    return pdk.Deck(
+    return CompactDeck(
         layers=layers,
         initial_view_state=view_state,
         map_style=pdk.map_styles.CARTO_LIGHT,
