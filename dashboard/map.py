@@ -1,7 +1,8 @@
 import pandas as pd
 import pydeck as pdk
+import streamlit as st
 
-from core.states_cities import DELHI_HQ_COORDS, ORIGIN_HUB
+from core.states_cities import DELHI_HQ_COORDS, ORIGIN_HUB, get_all_city_records, get_hub_record
 from dashboard.theme import (
     ARC_SOURCE_RGB,
     PIN_LABEL_COLOR,
@@ -247,4 +248,24 @@ def build_clean_map_deck(all_records, active_hub=None, active_status=None, is_sc
         initial_view_state=view_state,
         map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={"text": "{name}"},
+    )
+
+
+@st.cache_resource(show_spinner=False, max_entries=64)
+def cached_map_deck(state, city, status, is_scored, has_borders):
+    """The deck depends only on these five values, so any other input change (quantity, price, window) reuses it.
+    Same deck means identical JSON, so the browser keeps the map as it is instead of redrawing it."""
+    hub = get_hub_record(state, city) if (state and city) else None
+    return build_clean_map_deck(
+        get_all_city_records(), active_hub=hub, active_status=status if hub else None, is_scored=is_scored,
+    )
+
+
+def get_map_deck(active_hub, active_status, is_scored):
+    return cached_map_deck(
+        active_hub["state"] if active_hub else None,
+        active_hub["city"] if active_hub else None,
+        active_status if active_hub else None,
+        bool(is_scored),
+        load_india_states_geojson() is not None,
     )
