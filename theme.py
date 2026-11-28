@@ -749,6 +749,121 @@ div[data-testid="stDeckGlJsonChart"] {{
     border-radius: 999px;
 }}
 
+.intel-table td strong {{
+    display: block;
+    font-weight: 700;
+    line-height: 1.25;
+}}
+
+.intel-table td .sub {{
+    display: block;
+    margin-top: 2px;
+    font-size: 11.5px;
+    line-height: 1.3;
+    color: {TEXT_SUB} !important;
+}}
+
+.intel-table td:has(.mini-bar) strong {{
+    display: inline;
+}}
+
+.intel-table td {{
+    vertical-align: middle;
+}}
+
+.table-wrap {{
+    overflow-x: auto;
+}}
+
+.table-note {{
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid {BORDER_CARD};
+    color: {TEXT_SUB} !important;
+}}
+
+.scan-head {{
+    margin-bottom: 6px;
+}}
+
+.scan-sub {{
+    font-size: 12.5px;
+    color: {TEXT_SUB} !important;
+}}
+
+.st-key-scan_card {{
+    background-color: {BG_CARD} !important;
+    border: 1px solid {BORDER_CARD} !important;
+    border-radius: 14px !important;
+    padding: 14px 18px 10px 18px !important;
+    box-shadow: {TILE_SHADOW};
+    margin-bottom: 12px;
+}}
+
+.st-key-scan_card div[data-testid="stButton"] > button {{
+    min-height: 44px;
+    white-space: nowrap;
+}}
+
+.st-key-scan_window_mode,
+.st-key-scan_window_mode div[data-testid="stRadio"] {{
+    width: 100% !important;
+}}
+
+.st-key-scan_window_mode label p {{
+    white-space: nowrap;
+    margin: 0 !important;
+}}
+
+.st-key-scan_window_mode div[role="radiogroup"] {{
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    width: 100%;
+}}
+
+.st-key-scan_window_mode div[role="radiogroup"] > div {{
+    flex: 1 1 0;
+    margin: 0 !important;
+}}
+
+.st-key-scan_window_mode label[data-baseweb="radio"],
+.st-key-scan_window_mode label[data-testid="stRadioOption"] {{
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    align-items: center;
+    margin: 0 !important;
+    padding: 10px 14px !important;
+    min-height: 44px;
+    border: 1.5px solid {BORDER_CARD};
+    border-radius: 10px;
+    background: #ffffff;
+    cursor: pointer;
+}}
+
+.st-key-scan_window_mode label[data-baseweb="radio"] > div:first-child,
+.st-key-scan_window_mode label[data-testid="stRadioOption"] > div > div:first-child:not([data-testid]) {{
+    display: none !important;
+}}
+
+.st-key-scan_window_mode label[data-baseweb="radio"]:hover,
+.st-key-scan_window_mode label[data-testid="stRadioOption"]:hover {{
+    border-color: {ACCENT};
+}}
+
+.st-key-scan_window_mode label[data-baseweb="radio"]:has(input:checked),
+.st-key-scan_window_mode label[data-testid="stRadioOption"]:has(input:checked) {{
+    background: {ACCENT_SOFT};
+    border-color: {ACCENT};
+}}
+
+.st-key-scan_window_mode label:has(input:checked) p {{
+    color: {ACCENT} !important;
+}}
+
 .tag-crit {{
     display: inline-block;
     background: rgba(244, 63, 94, 0.16);
