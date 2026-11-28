@@ -209,6 +209,10 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28: Map speed (`dashboard/map.py`, `dashboard/theme.py`). Measured first: a rerun costs about 0.25 s in Python, so the delay was in the data sent to the browser. Two causes found. (1) The state-border GeoJSON downloaded from GitHub is 22,967,643 bytes and went into the map data on every rerun. (2) `pydeck`'s `to_json()` pretty-prints, so the map data was 8.32 MB for about 1.3 MB of content. Fixes: borders keep only geometry, coordinates rounded to 2 decimals (about 1 km), repeated points removed and points closer than 0.03 degrees (about 3 km, under one screen pixel at zoom 4.25) dropped, giving 0.31 MB; the light copy is kept in memory and on disk (`data/india_states_v2.json`, gitignored), and a failed download is retried after 5 minutes instead of being cached as "no borders"; `CompactDeck` sends compact JSON built once; `cached_map_deck()` rebuilds the map only when state, city, status, scored flag or border availability change, so quantity, price and window changes reuse it. Map data per rerun: 8.32 MB to 0.34 MB. Not measured: frame rate in a real browser; Run Risk Assessment (live weather and routing) and CARTO map tiles are outside this fix.
+- 2026-11-28: City records are built once (`lru_cache` in `core/states_cities.py`) instead of 46 lookups on every rerun; `get_all_city_records()` still returns a fresh list.
+- 2026-11-28: Console layout (`app.py`, `dashboard/theme.py`). The console is now one bordered card (the old banner was an empty box with the controls outside it). Origin Hub is a disabled text input so it lines up with the other fields (the old pill sat lower). The second row is bottom-aligned, so Run Risk Assessment sits level with the inputs. `requirements.txt` now pins `streamlit>=1.36` for `vertical_alignment`. Viewed in a screenshot with fake weather.
+- 2026-11-28: Network scan UI tidy (`dashboard/corridor.py`, `dashboard/theme.py`). Scan controls moved into their own card above the filters, with a title, a one-line description, a primary "Run Network Scan" button and the window choice as two pills (the unselected radio used to render as a solid black dot). The corridor table went from 9 columns to 7 (Delhi HQ to, Distance, Window, Route Penalty, Weather, Est. Risk, Status): state and terrain sit under the city, km/day needed under the distance, and the penalty breakdown under the penalty. The table scrolls sideways on narrow screens. Scan behaviour is unchanged. Not done: a column showing each hub's recommended days next to the console window, and a flag for `days_capped`; the two window options give near-identical results whenever the console window is already long enough (route penalty is 0 under both), and the ML base risk does not depend on the window at all.
 - 2026-11-28: Network Corridor Intelligence gets a "Run Network Scan" button (`corridor.py`, `api_client.py`). It posts hubs to `/predict/batch` in chunks of 6 with a progress bar, either with the console window or each hub's recommended days. The table gains Window and Weather columns, an "as of" note and a stale-scan caption when inputs change. Hubs whose forecast failed show "unavailable". 93 tests.
 
 - 2026-11-23: Page 1 now uses the API for weather. Added a dispatch date picker; the request sends `dispatch_date`, destination coordinates and state. The summary card shows the penalty split, weather window, worst segment, route averages and arrival date from the response, and a "weather unavailable" warning when `weather_available` is false. Removed the dashboard's own live weather fetch and the static offline fallback (including the invented +1 day relief); if the API is down or rejects the order the dashboard shows the error and stores nothing. Removed the per-hub advisory text from the card.
@@ -217,7 +221,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 - 2026-11-23: Prepared an updated `app.py`: consolidated summary card, title no longer hidden under the header (top padding 2.2rem to 4.5rem), emojis and clutter removed, solid accent on the Run button ("Run risk assessment"). Not yet confirmed applied to the repo.
 - 2026-11-21: Replaced CSV input with the single-order flow (`validate_inputs`, `get_prediction`, session-state results), added `status_from_risk` and `get_arrival_weather`, removed fake metrics. Results are tied to the exact payload, so an input change needs a re-run. The Run button sits above the sidebar panels.
 
-**Open:** add caption near the transit window slider; confirm the update was applied against the latest local `app.py`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`, cache or localise the state borders).
+**Open:** add caption near the transit window slider; confirm the update was applied against the latest local `app.py`; check the map filter selector in the deployed Streamlit version; theme toggle looks broken (`.streamlit/config.toml` option suggested); slow loading (move the repo out of OneDrive, run with `--server.fileWatcherType none`; state borders are now cached and thinned, see the 2026-11-28 map entry); add a recommended-days column and a `days_capped` flag to the corridor table.
 
 ---
 
@@ -281,12 +285,13 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28: 101 tests. Added `tests/test_map_cache.py` (5): border simplification and thinning, ring closure, compact deck JSON built once, deck reuse, city-record caching. `test_model_days.py` moved from the repo root into `tests/` (3 tests, now found by `unittest discover`). Run `python -m unittest discover -s tests -t . -v` from the repo root.
 - 2026-11-28: 87 tests. Added `/predict/batch` (8), cache and throttle (5) and `recommended_days` (2) tests.
 - 2026-11-28 (`fix/model-days`, anshika-009): Added `tests/test_model_days.py` for model scheduled-day routing vs. transit window.
 
 - 2026-11-23: Tests moved into `tests/` with `tests/__init__.py`. App modules stay in the repo root.
 
-**Open:** direct tests for the status thresholds in `inference.py`; live checks are manual (`experiments/`).
+**Open:** direct tests for the status thresholds in `inference.py`; live checks are manual (`ml/experiments/`).
 
 ---
 
