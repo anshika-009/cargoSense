@@ -1,8 +1,8 @@
 import pandas as pd
 import pydeck as pdk
 
-from states_cities import DELHI_HQ_COORDS, ORIGIN_HUB
-from theme import (
+from core.states_cities import DELHI_HQ_COORDS, ORIGIN_HUB
+from dashboard.theme import (
     ARC_SOURCE_RGB,
     PIN_LABEL_COLOR,
     STATE_BORDER_COLOR,

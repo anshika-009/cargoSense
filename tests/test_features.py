@@ -6,8 +6,8 @@ import unittest
 
 import pandas as pd
 
-import feature_data as fd
-import inference
+from ml import feature_data as fd
+from ml import inference
 
 DEFAULTS = {
     "Days for shipment (scheduled)": 4.0, "Sales per customer": 100.0, "Order Item Quantity": 1.0,

@@ -16,8 +16,8 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from xgboost import XGBClassifier
 
-import feature_data as fd
-import model_training as mt
+from ml import feature_data as fd
+from ml import model_training as mt
 
 NEVER_SHIPPED = ("CANCELED", "SUSPECTED_FRAUD")
 BASE_NUMERIC = [c for c in fd.NUMERIC_FEATURES if c != "same_day_order_hour"]

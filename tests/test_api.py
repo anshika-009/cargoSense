@@ -8,9 +8,9 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-import FastAPI as api
-import geo_utils
-import route_weather
+from api import main as api
+from core import geo_utils
+from core import route_weather
 
 BODY = {
     "order_quantity": 1, "sales_per_customer": 50, "product_price": 10,

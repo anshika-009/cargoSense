@@ -94,7 +94,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 - 2026-11-27: A logistic regression with the new feature also reaches 0.7712 ROC-AUC, confirming that the information in the data, not the model type, is the limit. Cancelled and suspected-fraud orders always have late rate 0 (label noise); dropping them from training did not help, so they stay.
 - 2026-11-27: Caveats. The inter-state dashboard rejects zero-day transit and Same Day has 0 scheduled days in the data, so the gain does not show up in what the dashboard can score. Each mode has exactly one scheduled day count in the data, so other combinations the slider allows are extrapolations. Training reads the order date column; serving sends `dispatch_hour`.
 
-**Open:** run `python -m experiments.improve_model` and `python model_training.py --cv` after any data change; run tests against the real model; choose the dashboard classification threshold (recall is 0.5773 at 0.5; the validation sweep is in `metrics.json`); decide whether to remove or relabel Same Day for inter-state use, since it cannot be scored there; update README note on trained days; pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
+**Open:** run `python -m ml.experiments.improve_model` and `python -m ml.model_training --cv` after any data change; run tests against the real model; choose the dashboard classification threshold (recall is 0.5773 at 0.5; the validation sweep is in `metrics.json`); decide whether to remove or relabel Same Day for inter-state use, since it cannot be scored there; update README note on trained days; pin versions in `requirements.txt`; `training_output.txt` was saved as UTF-16, so re-save as UTF-8 or leave it out of the repo.
 
 ---
 
@@ -300,6 +300,7 @@ A record of what we built, why, and what we rejected, organised by feature. With
 
 **Log:**
 
+- 2026-11-28: CONTRACT CHANGE (run commands and imports). Sorted the flat repo into packages: `api/` (`FastAPI.py` is now `api/main.py`), `core/` (geo, route and weather rules, `states_cities`), `dashboard/` (`api_client`, `corridor`, `simulator_view`, `map`, `theme`), `ml/` (`feature_data`, `inference`, `model_training`, `EDA`, `experiments/`), `reports/` (the two output text files). `Test_model_days.py` moved to `tests/test_model_days.py`. `app.py` stays in the root. New commands: `uvicorn api.main:app --reload`, `python -m ml.model_training --cv`, `python -m ml.experiments.improve_model`. `streamlit run app.py` is unchanged.
 - 2026-11-21: Set `main` as the base; a commit pushed to the wrong branch was moved to `feature/model-api`. Added the README and this log.
 
 **Open:** set `main` as the GitHub default branch; README must sit in the repo root (it is in `docs/`); replace 0.91 and 89.4% with the real numbers and fill F1 and the split; change the clone URL from SmartFreight to CargoSense; add the team doc, AGENTS.md and `docs/MODEL_TRAINING_PLAN.md` to the repo; update docs for `tests/`, the weather modules and the new API contract; pin `requirements.txt`; consider moving the project out of OneDrive.

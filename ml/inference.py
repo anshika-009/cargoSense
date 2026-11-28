@@ -4,7 +4,7 @@ Purpose: load the trained model once and turn one order into a late-delivery ris
 Notes: the model is given each shipping mode's trained scheduled days (Same Day 0, First Class 1,
 Second Class 2, Standard Class 4), the only pairs in the training data. The user's transit window
 is used for the weather and the route penalty, not by the model.
-Used by: FastAPI.py. Kept free of web code so it can be tested on its own.
+Used by: api/main.py. Kept free of web code so it can be tested on its own.
 """
 import json
 from pathlib import Path
@@ -12,9 +12,9 @@ from pathlib import Path
 import joblib
 from xgboost import XGBClassifier
 
-import feature_data as fd
+from ml import feature_data as fd
 
-MODELS_DIR = Path(__file__).parent / "models"
+MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 CRITICAL_THRESHOLD = 65
 MODERATE_THRESHOLD = 35
 PRED_THRESHOLD_PCT = 50

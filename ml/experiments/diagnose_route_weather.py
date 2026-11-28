@@ -8,10 +8,10 @@ The last argument is the transit days (default 4). City names must exist in stat
 """
 import sys
 
-import geo_utils
-import route_penalty
-import route_weather
-from states_cities import INDIA_STATES_CITIES
+from core import geo_utils
+from core import route_penalty
+from core import route_weather
+from core.states_cities import INDIA_STATES_CITIES
 
 
 def find_city(name):

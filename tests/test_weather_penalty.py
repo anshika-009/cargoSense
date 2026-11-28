@@ -6,7 +6,7 @@ Run: python -m unittest discover -s tests -t . -v
 """
 import unittest
 
-from weather_penalty import MAX_PENALTY, compute_weather_penalty
+from core.weather_penalty import MAX_PENALTY, compute_weather_penalty
 
 
 def total(**kwargs):

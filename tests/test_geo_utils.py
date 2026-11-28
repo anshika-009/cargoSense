@@ -4,7 +4,7 @@ Purpose: check geocoding, caching, failure handling, distance and market mapping
 """
 import unittest
 
-import geo_utils as gu
+from core import geo_utils as gu
 
 
 class FakeLocation:
