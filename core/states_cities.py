@@ -4,6 +4,8 @@ from Delhi HQ. Holds no weather or risk values; those come from the API.
 Used by: app.py.
 """
 
+from functools import lru_cache
+
 from geopy.distance import geodesic
 
 ORIGIN_HUB = "Delhi Hub (North HQ)"
@@ -325,12 +327,17 @@ def get_hub_record(state, city):
     return record
 
 
-def get_all_city_records():
-    """Return a flat list of all state+city corridor records across all 28 states."""
+@lru_cache(maxsize=1)
+def _all_city_records():
     all_records = []
     for state_name in sorted(INDIA_STATES_CITIES.keys()):
         for item in INDIA_STATES_CITIES[state_name]:
             rec = get_hub_record(state_name, item["city"])
             if rec is not None:
                 all_records.append(rec)
-    return all_records
+    return tuple(all_records)
+
+
+def get_all_city_records():
+    """Return a flat list of all state+city corridor records across all 28 states (built once, then reused)."""
+    return list(_all_city_records())

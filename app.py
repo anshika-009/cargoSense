@@ -29,83 +29,77 @@ apply_theme_and_header(current_view)
 # --- HORIZONTAL CARGOSENSE CONSOLE ---
 state_list = sorted(INDIA_STATES_CITIES.keys())
 
-st.markdown(
-    '<div class="console-banner"><div class="console-title">CargoSense Console — Route &amp; Order Controls</div>',
-    unsafe_allow_html=True,
-)
+with st.container(border=True, key="console"):
+    st.markdown('<div class="console-title">CargoSense Console — Route &amp; Order Controls</div>', unsafe_allow_html=True)
+    c_origin, c_state, c_city, c_mode, c_days = st.columns([1.3, 1.4, 1.4, 1.3, 1.3])
+    with c_origin:
+        st.text_input("Origin Hub (Default)", value=ORIGIN_HUB, disabled=True)
 
-c_origin, c_state, c_city, c_mode, c_days = st.columns([1.3, 1.4, 1.4, 1.3, 1.3])
-with c_origin:
-    st.caption("Origin Hub (Default)")
-    st.markdown(f'<div class="origin-pill">{ORIGIN_HUB}</div>', unsafe_allow_html=True)
-
-with c_state:
-    selected_state = st.selectbox(
-        "Destination State",
-        options=state_list,
-        index=None,
-        placeholder="Select destination state",
-    )
-
-with c_city:
-    if selected_state:
-        city_options = [item["city"] for item in INDIA_STATES_CITIES[selected_state]]
-        selected_city = st.selectbox(
-            "Destination City",
-            options=city_options,
+    with c_state:
+        selected_state = st.selectbox(
+            "Destination State",
+            options=state_list,
             index=None,
-            placeholder="Select destination city",
-        )
-    else:
-        selected_city = st.selectbox(
-            "Destination City",
-            options=[],
-            index=None,
-            placeholder="Select state first",
-            disabled=True,
+            placeholder="Select destination state",
         )
 
-with c_mode:
-    shipping_mode = st.selectbox(
-        "Shipping Mode",
-        ["Standard Class", "First Class", "Second Class", "Same Day"],
-        key="shipping_mode_input",
-    )
+    with c_city:
+        if selected_state:
+            city_options = [item["city"] for item in INDIA_STATES_CITIES[selected_state]]
+            selected_city = st.selectbox(
+                "Destination City",
+                options=city_options,
+                index=None,
+                placeholder="Select destination city",
+            )
+        else:
+            selected_city = st.selectbox(
+                "Destination City",
+                options=[],
+                index=None,
+                placeholder="Select state first",
+                disabled=True,
+            )
 
-with c_days:
-    committed_days = st.slider(
-        "Transit Window (Days)",
-        1,
-        6,
-        3,
-        key="committed_days_input",
-    )
+    with c_mode:
+        shipping_mode = st.selectbox(
+            "Shipping Mode",
+            ["Standard Class", "First Class", "Second Class", "Same Day"],
+            key="shipping_mode_input",
+        )
 
-c_qty, c_sales, c_price, c_date, c_view, c_run = st.columns([1.0, 1.1, 1.1, 1.3, 1.6, 1.5])
-with c_qty:
-    order_quantity = st.number_input("Quantity", min_value=1, value=1, step=1)
-with c_sales:
-    sales_per_customer = st.number_input("Sales (USD)", min_value=0.0, value=50.0, step=1.0)
-with c_price:
-    product_price = st.number_input("Price (USD)", min_value=0.0, value=10.0, step=1.0)
-with c_date:
-    dispatch_date = st.date_input(
-        "Dispatch Date",
-        value=date.today(),
-        min_value=date.today(),
-        max_value=date.today() + timedelta(days=FORECAST_HORIZON_DAYS - 1),
-    )
-with c_view:
-    nav_choice = st.selectbox(
-        "Workspace View",
-        ["Pre-Dispatch Risk Simulator", "Network Corridor Intelligence"],
-        key="workspace_view",
-    )
-with c_run:
-    st.write("")
-    run_clicked = st.button("Run Risk Assessment", type="primary", use_container_width=True)
+    with c_days:
+        committed_days = st.slider(
+            "Transit Window (Days)",
+            1,
+            6,
+            3,
+            key="committed_days_input",
+        )
 
-st.markdown("</div>", unsafe_allow_html=True)
+    c_qty, c_sales, c_price, c_date, c_view, c_run = st.columns([1.0, 1.1, 1.1, 1.3, 1.6, 1.5], vertical_alignment="bottom")
+    with c_qty:
+        order_quantity = st.number_input("Quantity", min_value=1, value=1, step=1)
+    with c_sales:
+        sales_per_customer = st.number_input("Sales (USD)", min_value=0.0, value=50.0, step=1.0)
+    with c_price:
+        product_price = st.number_input("Price (USD)", min_value=0.0, value=10.0, step=1.0)
+    with c_date:
+        dispatch_date = st.date_input(
+            "Dispatch Date",
+            value=date.today(),
+            min_value=date.today(),
+            max_value=date.today() + timedelta(days=FORECAST_HORIZON_DAYS - 1),
+        )
+    with c_view:
+        nav_choice = st.selectbox(
+            "Workspace View",
+            ["Pre-Dispatch Risk Simulator", "Network Corridor Intelligence"],
+            key="workspace_view",
+        )
+    with c_run:
+        run_clicked = st.button("Run Risk Assessment", type="primary", use_container_width=True, key="run_assessment")
+
 
 active_hub = (
     get_hub_record(selected_state, selected_city)

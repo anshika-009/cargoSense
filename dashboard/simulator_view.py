@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.api_client import run_and_store_assessment
-from dashboard.map import build_clean_map_deck
+from dashboard.map import get_map_deck
 from core.states_cities import ORIGIN_HUB, get_all_city_records
 from dashboard.theme import (
     ACCENT,
@@ -305,10 +305,5 @@ def render_simulator_page(
             expected_payload,
         )
     with right_col:
-        deck = build_clean_map_deck(
-            get_all_city_records(),
-            active_hub=active_hub,
-            active_status=current_status if active_hub else None,
-            is_scored=prediction is not None,
-        )
+        deck = get_map_deck(active_hub, current_status, prediction is not None)
         st.pydeck_chart(deck, width="stretch", height=540)

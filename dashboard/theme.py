@@ -1,4 +1,8 @@
 import base64
+import json
+import time
+from pathlib import Path
+
 import requests
 import streamlit as st
 
@@ -214,13 +218,65 @@ def metric_tile(label: str, value_html: str, sub_html: str, accent_color: str) -
     )
 
 
-@st.cache_data(show_spinner=False)
+GEOJSON_URL = "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson"
+GEOJSON_DISK_CACHE = Path(__file__).resolve().parent.parent / "data" / "india_states_light.json"
+GEOJSON_RETRY_SECONDS = 300
+
+
+def _round_coords(node, digits=2):
+    """Round every coordinate (about 1 km at 2 digits) and drop repeated points to shrink the payload."""
+    if node and isinstance(node[0], (int, float)):
+        return [round(node[0], digits), round(node[1], digits)]
+    out = [_round_coords(child, digits) for child in node]
+    if out and isinstance(out[0][0], (int, float)):
+        out = [pt for i, pt in enumerate(out) if i == 0 or pt != out[i - 1]]
+    return out
+
+
+def simplify_geojson(raw):
+    """Keep only geometry and rounded coordinates. The map draws borders only, so properties are dead weight."""
+    features = []
+    for feature in raw.get("features", []):
+        geometry = feature.get("geometry")
+        if geometry and geometry.get("coordinates"):
+            features.append({
+                "type": "Feature", "properties": {},
+                "geometry": {"type": geometry["type"], "coordinates": _round_coords(geometry["coordinates"])},
+            })
+    return {"type": "FeatureCollection", "features": features}
+
+
+@st.cache_resource(show_spinner=False)
+def _geojson_state():
+    return {"data": None, "tried_at": 0.0}
+
+
 def load_india_states_geojson():
-    url = "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson"
+    """State borders, light version. Read once, kept in memory and on disk. A failure is retried after 5 minutes, never cached."""
+    state = _geojson_state()
+    if state["data"] is not None:
+        return state["data"]
+    if time.time() - state["tried_at"] < GEOJSON_RETRY_SECONDS:
+        return None
+    state["tried_at"] = time.time()
     try:
-        res = requests.get(url, timeout=4.0)
+        if GEOJSON_DISK_CACHE.exists():
+            state["data"] = json.loads(GEOJSON_DISK_CACHE.read_text(encoding="utf-8"))
+            return state["data"]
+    except Exception:
+        pass
+    try:
+        res = requests.get(GEOJSON_URL, timeout=4.0)
         if res.status_code == 200:
-            return res.json()
+            light = simplify_geojson(res.json())
+            if light["features"]:
+                state["data"] = light
+                try:
+                    GEOJSON_DISK_CACHE.parent.mkdir(exist_ok=True)
+                    GEOJSON_DISK_CACHE.write_text(json.dumps(light, separators=(",", ":")), encoding="utf-8")
+                except Exception:
+                    pass
+                return light
     except Exception:
         pass
     return None
@@ -466,6 +522,36 @@ div[data-testid="stButton"] > button[kind="primary"] * {{
     text-transform: uppercase;
     color: {ACCENT} !important;
     margin-bottom: 8px;
+}}
+
+.st-key-console {{
+    background-color: {BG_CARD} !important;
+    border: 1px solid {BORDER_CARD} !important;
+    border-radius: 14px !important;
+    padding: 14px 18px 8px 18px !important;
+    box-shadow: {TILE_SHADOW};
+    margin-bottom: 16px;
+}}
+
+div[data-testid="stTextInput"] [data-baseweb="input"],
+div[data-testid="stTextInput"] [data-baseweb="base-input"] {{
+    background-color: {BOX_BG} !important;
+    border-color: {BOX_BORDER} !important;
+    border-radius: 8px !important;
+}}
+
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextInput"] input:disabled {{
+    background-color: {BOX_BG} !important;
+    color: {BOX_FG} !important;
+    -webkit-text-fill-color: {BOX_FG} !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+}}
+
+.st-key-run_assessment div[data-testid="stButton"] > button {{
+    min-height: 46px;
+    white-space: nowrap;
 }}
 
 .origin-pill {{
