@@ -84,10 +84,17 @@ WINDOW_RECOMMENDED = "Recommended days per hub"
 
 
 def render_scan_controls(committed_days, qty, sales, price, shipping_mode, dispatch_date):
-    """Scan button and window choice. Returns the stored scan only if it matches the current inputs."""
+    """Scan card: title, window choice and button. Returns the stored scan only if it matches the current inputs."""
     if shipping_mode is None or dispatch_date is None:
         return None
-    c_window, c_button = st.columns([3, 2])
+    st.markdown(
+        '<div class="scan-head">'
+        '<div class="card-title" style="margin-bottom:2px;">Network Scan</div>'
+        '<div class="scan-sub">Score all hubs with their own route weather. Pick the transit window to use.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    c_window, c_button = st.columns([3, 1.4], vertical_alignment="center")
     with c_window:
         window_choice = st.radio(
             "Scan window", [WINDOW_CONSOLE, WINDOW_RECOMMENDED], horizontal=True,
@@ -95,7 +102,7 @@ def render_scan_controls(committed_days, qty, sales, price, shipping_mode, dispa
         )
     days = int(committed_days) if window_choice == WINDOW_CONSOLE else None
     with c_button:
-        clicked = st.button("Run Network Scan", use_container_width=True)
+        clicked = st.button("Run Network Scan", type="primary", use_container_width=True)
     if clicked:
         bar = st.progress(0.0, text="Scoring every hub with its own route weather")
         scan, error = run_network_scan(
@@ -119,7 +126,9 @@ def render_corridor_intelligence(
     shipping_mode=None, price=10.0, dispatch_date=None,
 ):
     mode_text = f"{shipping_mode}, " if shipping_mode else ""
-    scan = render_scan_controls(committed_days, qty, sales, price, shipping_mode, dispatch_date)
+    top_slot = st.container()
+    with st.container(border=True, key="scan_card"):
+        scan = render_scan_controls(committed_days, qty, sales, price, shipping_mode, dispatch_date)
     window_text = "recommended days per hub" if (scan and scan["key"][4] is None) else f"{committed_days}-day window"
     active_key = (hub_rec.get("state"), hub_rec.get("city")) if (hub_rec and scored_pred) else None
     live_weather = (scored_pred.get("weather") or {}) if scored_pred else {}
@@ -182,73 +191,74 @@ def render_corridor_intelligence(
     n_states = len({r["state"] for r in rows})
     strained = sum(1 for r in rows if r["route_pts"] > 0)
 
-    k1, k2, k3 = st.columns(3)
-    with k1:
-        st.markdown(
-            metric_tile("Tracked Hubs", str(len(rows)), f"Destination cities across {n_states} states", ACCENT),
-            unsafe_allow_html=True,
-        )
-    with k2:
-        st.markdown(
-            metric_tile(
-                "Hubs With Route Penalty",
-                str(strained),
-                f"{mode_text}{window_text} · longest: {longest['city']} ({longest['dist']:,.0f} km)",
-                ACCENT,
-            ),
-            unsafe_allow_html=True,
-        )
-    with k3:
-        if live_row:
-            live_status = status_from_risk(live_row["live_pct"])
+    with top_slot:
+        k1, k2, k3 = st.columns(3)
+        with k1:
+            st.markdown(
+                metric_tile("Tracked Hubs", str(len(rows)), f"Destination cities across {n_states} states", ACCENT),
+                unsafe_allow_html=True,
+            )
+        with k2:
             st.markdown(
                 metric_tile(
-                    "Live Route Risk",
-                    f'<span style="color: {STATUS_COLORS[live_status]};">{live_row["live_pct"]:.1f}%</span>',
-                    f'{live_row["city"]}: {live_status}',
-                    STATUS_FILL[live_status],
+                    "Hubs With Route Penalty",
+                    str(strained),
+                    f"{mode_text}{window_text} · longest: {longest['city']} ({longest['dist']:,.0f} km)",
+                    ACCENT,
                 ),
+                unsafe_allow_html=True,
+            )
+        with k3:
+            if live_row:
+                live_status = status_from_risk(live_row["live_pct"])
+                st.markdown(
+                    metric_tile(
+                        "Live Route Risk",
+                        f'<span style="color: {STATUS_COLORS[live_status]};">{live_row["live_pct"]:.1f}%</span>',
+                        f'{live_row["city"]}: {live_status}',
+                        STATUS_FILL[live_status],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    metric_tile("Live Route Risk", "Not scored", "Run an assessment on the Pre-Dispatch Risk Simulator", ACCENT),
+                    unsafe_allow_html=True,
+                )
+
+        if live_row:
+            total_order_value = float(sales) * int(qty)
+            risk_prob = float(scored_pred["late_delivery_risk_prob"])
+            est_exposure = total_order_value * risk_prob * SLA_PENALTY_RATE
+            roi_pct = (est_exposure - EXPEDITE_COST_USD) / EXPEDITE_COST_USD * 100.0
+            live_cond = (
+                condition_label(live_row["precip"], live_row["wind"]) if weather_available else "Weather unavailable"
+            )
+            st.markdown(
+                f'<div class="intel-card">'
+                f'<div class="card-title">Live /predict Order Impact · {ORIGIN_HUB} → {hub_rec["city"]} ({hub_rec["state"]})</div>'
+                f'<div style="display:flex; flex-wrap:wrap; gap:24px; font-size:13.5px;">'
+                f'<div><strong>Live Total Risk:</strong> <span style="color:{STATUS_COLORS[status_from_risk(risk_prob * 100.0)]}; font-weight:700;">{risk_prob * 100.0:.1f}%</span></div>'
+                f'<div><strong>Live Distance:</strong> {float(scored_pred.get("distance_km", live_row["dist"])):,.0f} km</div>'
+                f'<div><strong>Window:</strong> {committed_days} days</div>'
+                f'<div><strong>Live Weather:</strong> {live_cond}</div>'
+                f'<div><strong>Order Value:</strong> ${total_order_value:,.2f}</div>'
+                f'<div><strong>SLA Penalty Exposure ({SLA_PENALTY_RATE:.0%}):</strong> <span style="color:{CRIT_TEXT}; font-weight:700;">${est_exposure:,.2f}</span></div>'
+                f'<div><strong>Expedite Cost vs ROI:</strong> ${EXPEDITE_COST_USD:,.0f} ({roi_pct:+.0f}% ROI)</div>'
+                f'</div>'
+                f'<div style="font-size:12px; margin-top:8px; color:{TEXT_SUB};">The {SLA_PENALTY_RATE:.0%} penalty rate and ${EXPEDITE_COST_USD:,.0f} expedite cost are planning assumptions, not model outputs.</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
         else:
             st.markdown(
-                metric_tile("Live Route Risk", "Not scored", "Run an assessment on the Pre-Dispatch Risk Simulator", ACCENT),
+                f'<div class="intel-card">'
+                f'<div class="card-title">Live /predict Order Impact</div>'
+                f'<div style="font-size:13px; color:{TEXT_SUB};">'
+                f"No active live /predict score for the current order/route. Run an assessment on <strong>Pre-Dispatch Risk Simulator</strong> to view live model risk and SLA exposure here."
+                f"</div></div>",
                 unsafe_allow_html=True,
             )
-
-    if live_row:
-        total_order_value = float(sales) * int(qty)
-        risk_prob = float(scored_pred["late_delivery_risk_prob"])
-        est_exposure = total_order_value * risk_prob * SLA_PENALTY_RATE
-        roi_pct = (est_exposure - EXPEDITE_COST_USD) / EXPEDITE_COST_USD * 100.0
-        live_cond = (
-            condition_label(live_row["precip"], live_row["wind"]) if weather_available else "Weather unavailable"
-        )
-        st.markdown(
-            f'<div class="intel-card">'
-            f'<div class="card-title">Live /predict Order Impact · {ORIGIN_HUB} → {hub_rec["city"]} ({hub_rec["state"]})</div>'
-            f'<div style="display:flex; flex-wrap:wrap; gap:24px; font-size:13.5px;">'
-            f'<div><strong>Live Total Risk:</strong> <span style="color:{STATUS_COLORS[status_from_risk(risk_prob * 100.0)]}; font-weight:700;">{risk_prob * 100.0:.1f}%</span></div>'
-            f'<div><strong>Live Distance:</strong> {float(scored_pred.get("distance_km", live_row["dist"])):,.0f} km</div>'
-            f'<div><strong>Window:</strong> {committed_days} days</div>'
-            f'<div><strong>Live Weather:</strong> {live_cond}</div>'
-            f'<div><strong>Order Value:</strong> ${total_order_value:,.2f}</div>'
-            f'<div><strong>SLA Penalty Exposure ({SLA_PENALTY_RATE:.0%}):</strong> <span style="color:{CRIT_TEXT}; font-weight:700;">${est_exposure:,.2f}</span></div>'
-            f'<div><strong>Expedite Cost vs ROI:</strong> ${EXPEDITE_COST_USD:,.0f} ({roi_pct:+.0f}% ROI)</div>'
-            f'</div>'
-            f'<div style="font-size:12px; margin-top:8px; color:{TEXT_SUB};">The {SLA_PENALTY_RATE:.0%} penalty rate and ${EXPEDITE_COST_USD:,.0f} expedite cost are planning assumptions, not model outputs.</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f'<div class="intel-card">'
-            f'<div class="card-title">Live /predict Order Impact</div>'
-            f'<div style="font-size:13px; color:{TEXT_SUB};">'
-            f"No active live /predict score for the current order/route. Run an assessment on <strong>Pre-Dispatch Risk Simulator</strong> to view live model risk and SLA exposure here."
-            f"</div></div>",
-            unsafe_allow_html=True,
-        )
 
     st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
     f_col1, f_col2 = st.columns([3, 2])
@@ -278,24 +288,25 @@ def render_corridor_intelligence(
     rows_html = ""
     for row in filtered:
         terrain_cell = TERRAIN_LABELS[row["terrain"]]
-        speed_cell = f"{row['speed']:,.0f} km/day"
-        penalty_cell = (
-            f"+{row['route_pts']:.1f} pts "
-            f"<span style='color:{TEXT_SUB}; font-size:11px;'>(window {row['slack_pts']:.1f} + terrain {row['terrain_pts']:.1f})</span>"
-            if row["route_pts"] > 0
-            else "0.0 pts"
-        )
-        if row["weather_pts"] == "unavailable":
-            weather_cell = f"<span style='color:{TEXT_SUB};'>unavailable</span>"
-        elif row["weather_pts"] is None:
-            weather_cell = f"<span style='color:{TEXT_SUB};'>—</span>"
+        speed_cell = f"{row['speed']:,.0f} km/day needed"
+        if row["route_pts"] > 0:
+            penalty_cell = (
+                f"<strong>+{row['route_pts']:.1f} pts</strong>"
+                f"<span class='sub'>window {row['slack_pts']:.1f} + terrain {row['terrain_pts']:.1f}</span>"
+            )
         else:
-            weather_cell = f"+{row['weather_pts']:.1f} pts"
+            penalty_cell = "<strong>0.0 pts</strong>"
+        if row["weather_pts"] == "unavailable":
+            weather_cell = "<span class='sub' style='margin:0;'>unavailable</span>"
+        elif row["weather_pts"] is None:
+            weather_cell = "<span class='sub' style='margin:0;'>—</span>"
+        else:
+            weather_cell = f"<strong>+{row['weather_pts']:.1f} pts</strong>"
         if row["scan_error"]:
-            risk_cell = f"<span style='color:{TEXT_SUB};'>Not scored</span>"
+            risk_cell = "<span class='sub' style='margin:0;'>Not scored</span>"
             tag = f"<span style='color:{TEXT_SUB};' title='{html.escape(str(row['scan_error']), quote=True)}'>Scan failed</span>"
         elif row["total_pct"] is None:
-            risk_cell = f"<span style='color:{TEXT_SUB};'>Run an assessment or scan</span>"
+            risk_cell = "<span class='sub' style='margin:0;'>Not scored yet</span>"
             tag = f"<span style='color:{TEXT_SUB};'>—</span>"
         else:
             risk_cell = (
@@ -310,11 +321,10 @@ def render_corridor_intelligence(
         )
         rows_html += (
             f"<tr>"
-            f"<td><strong>Delhi HQ → {row['city']}</strong> <span style='color:{TEXT_SUB};'>({row['state']})</span>{src_badge}</td>"
-            f"<td>{row['dist']:,.0f} KM</td>"
-            f"<td>{terrain_cell}</td>"
-            f"<td>{row['days']}d</td>"
-            f"<td>{speed_cell}</td>"
+            f"<td><strong>{row['city']}</strong>{src_badge}"
+            f"<span class='sub'>{row['state']} · {terrain_cell}</span></td>"
+            f"<td><strong>{row['dist']:,.0f} km</strong><span class='sub'>{speed_cell}</span></td>"
+            f"<td><strong>{row['days']}d</strong></td>"
             f"<td>{penalty_cell}</td>"
             f"<td>{weather_cell}</td>"
             f"<td>{risk_cell}</td>"
@@ -323,7 +333,7 @@ def render_corridor_intelligence(
         )
 
     if not rows_html:
-        rows_html = f"<tr><td colspan='9' style='text-align:center; color:{TEXT_SUB}; padding:18px;'>No corridors match the selected filter.</td></tr>"
+        rows_html = f"<tr><td colspan='7' style='text-align:center; color:{TEXT_SUB}; padding:18px;'>No corridors match the selected filter.</td></tr>"
 
     if scan:
         scanned_ok = [i for i in scan["items"].values() if i["ok"]]
@@ -342,13 +352,13 @@ def render_corridor_intelligence(
     st.markdown(
         f'<div class="intel-card">'
         f'<div class="card-title">Corridor Overview — {mode_text}{window_text} ({len(filtered)} of {len(rows)} Hubs)</div>'
-        f'<table class="intel-table">'
-        f"<thead><tr><th>Corridor</th><th>Distance</th><th>Terrain</th><th>Window</th><th>Speed Needed</th>"
+        f'<div class="table-wrap"><table class="intel-table">'
+        f"<thead><tr><th>Delhi HQ to</th><th>Distance</th><th>Window</th>"
         f"<th>Route Penalty</th><th>Weather</th><th>Est. Risk</th><th>Status</th></tr></thead>"
         f"<tbody>{rows_html}</tbody>"
-        f"</table>"
-        f'<div style="font-size:12px; margin-top:8px; color:{TEXT_SUB};">{note}'
-        f"The model does not see the destination, so hubs differ only by route penalty (distance and terrain versus the window) and weather. "
-        f"Route penalty is a rule-based heuristic, not learned, and does not depend on shipping mode.</div></div>",
+        f"</table></div>"
+        f'<div class="table-note">{note}'
+        f"Hubs differ only by route penalty and weather: the model does not see the destination. "
+        f"Route penalty is a rule-based heuristic, not learned.</div></div>",
         unsafe_allow_html=True,
     )
